@@ -1,0 +1,79 @@
+name = "aci-platform"
+main = "src/index.ts"
+compatibility_date = "2024-12-05"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "aci-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+ENVIRONMENT = "development"
+NODE_ENV = "development"
+PORT = "4001"
+FRONTEND_URL = "http://localhost:3000"
+API_URL = "http://localhost:8787"
+
+R2_PUBLIC_URL = "https://<accountid>.r2.cloudflarestorage.com"
+
+SMTP_USERNAME = "<seu_email>"
+SMTP_PASSWORD = "<configure_via_secret>"
+RESEND_API_KEY = "<configure_via_secret>"
+
+DATABASE_URL = "<configure_via_secret>"
+SUPABASE_URL = "https://<project-ref>.supabase.co"
+SUPABASE_ANON_KEY = "<configure_via_secret>"
+
+GOOGLE_CLIENT_ID = "<configure_via_secret>"
+
+JWT_SECRET = "<configure_via_secret>"
+JWT_EXPIRES_IN = "7d"
+
+OPENAI_API_KEY = "<configure_via_secret>"
+OPENAI_MODEL_TEXT = "gpt-4-turbo-preview"
+OPENAI_MODEL_IMAGE = "dall-e-3"
+OPENAI_MAX_TOKENS = "2000"
+
+GEMINI_API_KEY = "<configure_via_secret>"
+
+REDIS_HOST = "<configure_via_secret>"
+REDIS_PORT = "6379"
+REDIS_PASSWORD = "<configure_via_secret>"
+REDIS_DATABASE = "0"
+
+FACEBOOK_APP_ID = "<configure_via_secret>"
+FACEBOOK_APP_SECRET = "<configure_via_secret>"
+INSTAGRAM_APP_SECRET = "<configure_via_secret>"
+INSTAGRAM_REDIRECT_URI = "https://aci.automacoescomerciais.com.br/dashboard/callback"
+INSTAGRAM_ACCESS_TOKEN = "<configure_via_secret>"
+META_WEBHOOK_VERIFY_TOKEN = "<configure_via_secret>"
+META_REDIRECT_URI = "http://localhost:8787/api/integrations/instagram/callback"
+META_API_VERSION = "v23.0"
+
+SHOPEE_AFFILIATE_ID = "seu_id_afiliado"
+
+MERCADOPAGO_ACCESS_TOKEN = "<configure_via_secret>"
+MERCADOPAGO_PUBLIC_KEY = "<configure_via_secret>"
+
+ML_APP_ID = "<configure_via_secret>"
+ML_CLIENT_SECRET = "<configure_via_secret>"
+ML_REDIRECT_URI = "https://automacoescomerciais.com.br"
+ML_ACCESS_TOKEN = "<configure_via_secret>"
+ML_REFRESH_TOKEN = "<configure_via_secret>"
+ML_TOKEN_EXPIRES_AT = "0"
+ML_USER_ID = "0"
+
+ENCRYPTION_KEY = "<configure_via_secret>"
+
+RATE_LIMIT_TTL = "60"
+RATE_LIMIT_MAX = "100"
+
+CREDIT_COST_GPT4_PER_1K_TOKENS = "0.05"
+CREDIT_COST_DALLE_PER_IMAGE = "0.20"
+CREDIT_COST_INSTAGRAM_POST = "0.10"
+CREDIT_COST_INSTAGRAM_DM = "0.05"
+CREDIT_COST_COMMENT_REPLY = "0.03"
+
+[[r2_buckets]]
+binding = "STORAGE"
+bucket_name = "aci-storage"
