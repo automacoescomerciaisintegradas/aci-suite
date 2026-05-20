@@ -7,12 +7,20 @@
  * Evita dependências específicas de ambiente
  */
 
-// URL da API - detecta automaticamente se está em produção ou desenvolvimento
-const isProduction = typeof window !== 'undefined' && !window.location.hostname.includes('localhost');
-
-// Em produção, usa a mesma origem (URL relativa vazia) - o backend está no mesmo servidor
-// Em desenvolvimento, usa localhost:4001
-const API_BASE_URL = 'http://localhost:4001';
+// URL da API:
+// - No navegador, prefere VITE_API_URL; sem ela usa mesma origem (com proxy no Vite).
+// - Fora do navegador (SSR/scripts), usa API_URL ou localhost:4001.
+const API_BASE_URL = (() => {
+    const envApiUrl = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_URL?.trim() : '';
+    if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+            return 'http://localhost:4001';
+        }
+        return envApiUrl || '';
+    }
+    return process.env.API_URL || 'http://localhost:4001';
+})();
 
 // Debug: mostrar qual URL está sendo usada
 console.log('🔧 API URL:', API_BASE_URL || '(mesma origem)');

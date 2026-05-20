@@ -4,8 +4,8 @@ compatibility_date = "2024-12-05"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "aci-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_name = "automation-db-aci"
+database_id = "45cf61a8-2faa-41dd-b261-8da24e16bf19"
 
 [vars]
 ENVIRONMENT = "development"

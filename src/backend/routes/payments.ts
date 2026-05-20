@@ -30,6 +30,276 @@ const CREDIT_PACKAGES = [
 // Bônus de 10% para qualquer recarga
 const BONUS_PERCENTAGE = 0.10;
 
+interface PaymentCustomerPayload {
+    name: string;
+    cellphone: string;
+    email: string;
+    taxId: string;
+}
+
+interface NormalizedPaymentPayload {
+    amount: number; // em centavos
+    expiresIn: number; // em dias
+    description: string;
+    customer: PaymentCustomerPayload;
+    metadata: {
+        externalid: number;
+        [key: string]: any;
+    };
+}
+
+const createdPaymentsByExternalId = new Map<string, any>();
+const processedWebhookEvents = new Set<string>();
+const creditedPayments = new Set<string>();
+const MAX_TRACKED_ITEMS = 5000;
+
+const pruneMap = <T>(map: Map<string, T>, max: number) => {
+    while (map.size > max) {
+        const oldestKey = map.keys().next().value;
+        if (!oldestKey) break;
+        map.delete(oldestKey);
+    }
+};
+
+const addTrackedEvent = (set: Set<string>, value: string) => {
+    set.add(value);
+    while (set.size > MAX_TRACKED_ITEMS) {
+        const oldestKey = set.values().next().value;
+        if (!oldestKey) break;
+        set.delete(oldestKey);
+    }
+};
+
+const onlyDigits = (value: unknown): string => String(value ?? '').replace(/\D/g, '');
+
+const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+const formatPhoneBr = (value: unknown): string => {
+    let digits = onlyDigits(value);
+    if (digits.length === 13 && digits.startsWith('55')) {
+        digits = digits.slice(2);
+    }
+    if (digits.length === 10) {
+        digits = `${digits.slice(0, 2)}9${digits.slice(2)}`;
+    }
+    if (digits.length !== 11) {
+        return '(11) 99999-9999';
+    }
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const formatCpf = (value: unknown): string => {
+    const digits = onlyDigits(value);
+    if (digits.length !== 11) {
+        return '123.456.789-00';
+    }
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
+const toAmountCents = (value: unknown): number => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        if (!Number.isInteger(value)) {
+            return Math.round(value * 100);
+        }
+        return value;
+    }
+
+    const raw = String(value ?? '').trim();
+    if (!raw) return 0;
+
+    const hasDecimalSeparator = raw.includes(',') || raw.includes('.');
+    if (hasDecimalSeparator) {
+        const normalized = raw.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+        const parsed = Number(normalized);
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+    }
+
+    const digits = onlyDigits(raw);
+    return digits ? Number(digits) : 0;
+};
+
+const clampExpiresInDays = (value: unknown): number => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 3;
+    return Math.min(30, Math.max(1, Math.trunc(parsed)));
+};
+
+const toExternalId = (value: unknown): number => {
+    const digits = onlyDigits(value);
+    if (digits.length > 0) {
+        return Number(digits.slice(0, 18));
+    }
+    const uniqueId = `${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    return Number(uniqueId);
+};
+
+const normalizeCreateRequest = (body: any): { payload: NormalizedPaymentPayload; warnings: string[] } => {
+    const warnings: string[] = [];
+    const rawCustomer = body?.customer || {};
+    const rawMetadata = body?.metadata || {};
+
+    const amount = Math.max(100, toAmountCents(body?.amount));
+    if (!body?.amount) warnings.push('amount não informado, preenchido com valor mínimo.');
+
+    const expiresIn = clampExpiresInDays(body?.expiresIn);
+    if (!body?.expiresIn) warnings.push('expiresIn não informado, preenchido com 3 dias.');
+
+    const name = String(rawCustomer?.name || '').trim() || 'Cliente WhatsApp';
+    const cellphone = formatPhoneBr(rawCustomer?.cellphone);
+    const emailCandidate = String(rawCustomer?.email || '').trim();
+    const email = isValidEmail(emailCandidate) ? emailCandidate : 'cliente@example.com';
+    const taxId = formatCpf(rawCustomer?.taxId);
+
+    if (!rawCustomer?.name) warnings.push('customer.name não informado.');
+    if (!rawCustomer?.cellphone) warnings.push('customer.cellphone não informado.');
+    if (!isValidEmail(emailCandidate)) warnings.push('customer.email inválido ou ausente.');
+    if (onlyDigits(rawCustomer?.taxId).length !== 11) warnings.push('customer.taxId inválido ou ausente.');
+
+    const externalid = toExternalId(rawMetadata?.externalid);
+
+    const payload: NormalizedPaymentPayload = {
+        amount,
+        expiresIn,
+        description: String(body?.description || 'Pagamento via WhatsApp').trim(),
+        customer: {
+            name,
+            cellphone,
+            email,
+            taxId,
+        },
+        metadata: {
+            ...rawMetadata,
+            externalid,
+        },
+    };
+
+    return { payload, warnings };
+};
+
+export const __paymentsTestUtils = {
+    toAmountCents,
+    clampExpiresInDays,
+    formatPhoneBr,
+    formatCpf,
+    normalizeCreateRequest,
+};
+
+// ==========================================
+// CRIAR PAGAMENTO PIX (WHATSAPP/API)
+// ==========================================
+router.post('/create', authMiddleware, async (req: any, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ error: 'Usuário não autenticado' });
+        }
+
+        if (!MP_CONFIG.accessToken) {
+            return res.status(500).json({ error: 'Integração Mercado Pago não configurada' });
+        }
+
+        const { payload, warnings } = normalizeCreateRequest(req.body);
+        const idempotencyKey = `${userId}:${payload.metadata.externalid}`;
+
+        const cached = createdPaymentsByExternalId.get(idempotencyKey);
+        if (cached) {
+            return res.json({
+                ...cached,
+                idempotent: true,
+                warnings,
+            });
+        }
+
+        const amountInReais = payload.amount / 100;
+        const expirationDate = new Date(Date.now() + payload.expiresIn * 24 * 60 * 60 * 1000);
+        const externalReference = `WHATS-${payload.metadata.externalid}`;
+
+        const baseCredits = Math.floor(amountInReais * 1000);
+        const bonusCredits = Math.floor(baseCredits * BONUS_PERCENTAGE);
+        const totalCredits = baseCredits + bonusCredits;
+
+        const [firstName, ...rest] = payload.customer.name.split(' ');
+        const lastName = rest.join(' ').trim();
+
+        const paymentPayload = {
+            transaction_amount: amountInReais,
+            description: payload.description,
+            payment_method_id: 'pix',
+            external_reference: externalReference,
+            notification_url: `${process.env.API_URL || 'http://localhost:4001'}/api/payments/webhook`,
+            date_of_expiration: expirationDate.toISOString(),
+            payer: {
+                email: payload.customer.email,
+                first_name: firstName || 'Cliente',
+                last_name: lastName || 'WhatsApp',
+            },
+            metadata: {
+                ...payload.metadata,
+                user_id: userId,
+                source: 'whatsapp',
+                credits_amount: baseCredits,
+                bonus_credits: bonusCredits,
+                total_credits: totalCredits,
+                customer_tax_id: onlyDigits(payload.customer.taxId),
+                customer_cellphone: onlyDigits(payload.customer.cellphone),
+            },
+        };
+
+        const mpResponse = await fetch(`${MP_CONFIG.apiUrl}/v1/payments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${MP_CONFIG.accessToken}`,
+                'X-Idempotency-Key': idempotencyKey,
+            },
+            body: JSON.stringify(paymentPayload),
+        });
+
+        const mpData = await mpResponse.json();
+        if (!mpResponse.ok) {
+            return res.status(mpResponse.status).json({
+                success: false,
+                error: mpData?.message || 'Erro ao criar pagamento PIX',
+                details: mpData,
+            });
+        }
+
+        const pixData = mpData.point_of_interaction?.transaction_data;
+        const responsePayload = {
+            success: true,
+            idempotent: false,
+            warnings,
+            payment: {
+                id: String(mpData.id),
+                status: mpData.status,
+                amount: payload.amount,
+                expiresIn: payload.expiresIn,
+                expiresAt: expirationDate.toISOString(),
+                description: payload.description,
+                externalid: payload.metadata.externalid,
+                externalReference,
+                pix: {
+                    code: pixData?.qr_code,
+                    qrCodeBase64: pixData?.qr_code_base64,
+                    ticketUrl: pixData?.ticket_url,
+                },
+            },
+        };
+
+        createdPaymentsByExternalId.set(idempotencyKey, responsePayload);
+        pruneMap(createdPaymentsByExternalId, MAX_TRACKED_ITEMS);
+
+        return res.json(responsePayload);
+    } catch (error: any) {
+        console.error('❌ Erro ao criar pagamento /create:', error);
+        return res.status(500).json({
+            success: false,
+            error: 'Erro interno ao criar pagamento',
+            message: error?.message || 'unknown',
+        });
+    }
+});
+
 // ==========================================
 // CRIAR PAGAMENTO PIX
 // ==========================================
@@ -188,8 +458,15 @@ router.get('/status/:paymentId', authMiddleware, async (req: any, res) => {
 router.post('/webhook', async (req, res) => {
     try {
         const { type, data, action } = req.body;
+        const eventKey = `${type || 'na'}:${action || 'na'}:${data?.id || 'na'}`;
 
         console.log(`📩 Webhook MP: ${type} | ${action || 'n/a'} | ID: ${data?.id || 'n/a'}`);
+
+        if (processedWebhookEvents.has(eventKey)) {
+            console.log(`↩️ Webhook duplicado ignorado: ${eventKey}`);
+            return res.status(200).send('OK');
+        }
+        addTrackedEvent(processedWebhookEvents, eventKey);
 
         // Responder rapidamente ao MP
         res.status(200).send('OK');
@@ -229,6 +506,11 @@ router.post('/webhook', async (req, res) => {
         });
 
         if (payment.status === 'approved') {
+            if (creditedPayments.has(String(payment.id))) {
+                console.log(`↩️ Crédito já aplicado para pagamento ${payment.id}. Ignorando duplicidade.`);
+                return;
+            }
+
             if (userId && totalCredits > 0) {
                 try {
                     await creditService.addCredits(
@@ -242,6 +524,7 @@ router.post('/webhook', async (req, res) => {
                             bonus_credits: payment.metadata?.bonus_credits || 0,
                         }
                     );
+                    addTrackedEvent(creditedPayments, String(payment.id));
                     console.log(`✅ Pagamento Aprovado: ${totalCredits.toLocaleString('pt-BR')} créditos -> ${userId.substring(0, 8)}`);
                 } catch (error) {
                     console.error('❌ Erro ao adicionar créditos:', error);

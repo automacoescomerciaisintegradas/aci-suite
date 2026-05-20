@@ -19,33 +19,104 @@ interface AiConfigOptions {
   tools?: any[];
 }
 
+const LOCAL_RUNNER_DEFAULT_URL = 'http://185.190.143.17:12434';
+const LOCAL_RUNNER_DEFAULT_MODEL = 'docker.io/ai/smollm2:latest';
+
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');
+
+const getLocalRunnerBaseUrl = (settings: Partial<Settings>): string => {
+  const configuredUrl = settings.ollamaApiKey?.trim();
+  const envUrl = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_LOCAL_RUNNER_URL?.trim() : '';
+  return normalizeBaseUrl(configuredUrl || envUrl || LOCAL_RUNNER_DEFAULT_URL);
+};
+
+const resolveLocalRunnerModel = (rawModel: string): string => {
+  const alias = rawModel.replace('local-runner/', '').trim();
+  if (!alias || alias === 'smollm2') return LOCAL_RUNNER_DEFAULT_MODEL;
+  return alias;
+};
+
+const isGeminiQuotaError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('resource_exhausted') ||
+    normalized.includes('quota exceeded') ||
+    normalized.includes('"code":429') ||
+    normalized.includes('status":"resource_exhausted"')
+  );
+};
+
+const getFallbackModel = (settings: Partial<Settings>): string | null => {
+  if (settings.openaiApiKey?.trim()) return 'gpt-4o-mini';
+  if (settings.groqApiKey?.trim()) return 'llama3-8b-8192';
+  if (settings.anthropicApiKey?.trim()) return 'claude-3-5-sonnet-latest';
+  if (settings.ollamaApiKey?.trim()) return 'ollama/local';
+  if (getLocalRunnerBaseUrl(settings)) return 'local-runner/smollm2';
+  return null;
+};
+
+const getGeminiApiKey = (settings: Partial<Settings>): string => {
+  const localApiKey = settings.geminiApiKey?.trim();
+  const viteApiKey = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_GEMINI_API_KEY?.trim() : undefined;
+  const legacyViteApiKey = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_KEY?.trim() : undefined;
+  const nodeApiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY?.trim() : undefined;
+
+  return localApiKey || viteApiKey || legacyViteApiKey || nodeApiKey || '';
+};
+
 const callAiUnified = async (prompt: string, options: AiConfigOptions = {}): Promise<string> => {
   const settings = getSettings();
-  const model = settings.aiTextModel || 'gemini-2.0-flash';
+  let model = settings.aiTextModel || 'gemini-2.0-flash';
+  const geminiApiKey = getGeminiApiKey(settings);
+  const hasGeminiKey = geminiApiKey.length >= 10;
+
+  // Fallback automático: se o modelo escolhido for Gemini mas a chave estiver ausente,
+  // tenta outro provedor já configurado antes de falhar.
+  if ((model.includes('gemini') || !model.includes('-')) && !hasGeminiKey) {
+    const fallbackModel = getFallbackModel(settings);
+    if (fallbackModel) {
+      model = fallbackModel;
+    } else {
+      throw new Error("Nenhuma chave de IA configurada. Defina GEMINI_API_KEY (ou VITE_GEMINI_API_KEY) no Painel Administrativo.");
+    }
+  }
 
   // 1. GEMINI
   if (model.includes('gemini') || !model.includes('-')) { // Fallback to Gemini if model name doesn't specify provider
-    const ai = getAiClient();
-    const result = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: {
-        systemInstruction: options.systemInstruction,
-        temperature: options.temperature ?? settings.aiTemperature ?? 0.7,
-        topP: settings.aiTopP ?? 0.95,
-        topK: settings.aiTopK ?? 40,
-        maxOutputTokens: settings.aiMaxOutputTokens ?? 2048,
-        ...(options.responseMimeType === 'application/json' ? { responseMimeType: 'application/json' } : {}),
-        ...(options.tools ? { tools: options.tools } : {})
+    try {
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      const result = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: {
+          systemInstruction: options.systemInstruction,
+          temperature: options.temperature ?? settings.aiTemperature ?? 0.7,
+          topP: settings.aiTopP ?? 0.95,
+          topK: settings.aiTopK ?? 40,
+          maxOutputTokens: settings.aiMaxOutputTokens ?? 2048,
+          ...(options.responseMimeType === 'application/json' ? { responseMimeType: 'application/json' } : {}),
+          ...(options.tools ? { tools: options.tools } : {})
+        }
+      });
+      return result.text;
+    } catch (error) {
+      const fallbackModel = getFallbackModel(settings);
+      if (fallbackModel) {
+        model = fallbackModel;
+      } else if (isGeminiQuotaError(error)) {
+        throw new Error('Cota do Gemini excedida e nenhum provedor alternativo foi configurado. Adicione uma chave OpenAI/Groq/Anthropic/Ollama/Runner local ou recarregue cota no Gemini.');
+      } else {
+        throw error;
       }
-    });
-    return result.text;
+    }
   }
 
   // 2. OPENAI / ANTHROPIC / GROQ / OLLAMA
   let apiKey = '';
   let baseUrl = '';
   let provider = '';
+  let requestModel = model;
 
   if (model.includes('gpt') || model.startsWith('openai/')) {
     provider = 'openai';
@@ -61,23 +132,28 @@ const callAiUnified = async (prompt: string, options: AiConfigOptions = {}): Pro
     baseUrl = 'https://api.groq.com/openai/v1/chat/completions';
   } else if (settings.ollamaApiKey) {
     provider = 'ollama';
-    baseUrl = `${settings.ollamaApiKey}/v1/chat/completions`;
+    baseUrl = `${normalizeBaseUrl(settings.ollamaApiKey)}/v1/chat/completions`;
     apiKey = 'local';
+  } else if (model.startsWith('local-runner/')) {
+    provider = 'local-runner';
+    baseUrl = `${getLocalRunnerBaseUrl(settings)}/v1/chat/completions`;
+    apiKey = 'local';
+    requestModel = resolveLocalRunnerModel(model);
   }
 
-  if (!apiKey && provider !== 'ollama') {
+  if (!apiKey && provider !== 'ollama' && provider !== 'local-runner') {
     throw new Error(`Chave de API necessária para o modelo ${model}. Configure no Painel Administrativo.`);
   }
 
   const isAnthropic = provider === 'anthropic';
   const requestBody: any = isAnthropic ? {
-    model: model,
+    model: requestModel,
     messages: [{ role: 'user', content: prompt }],
     system: options.systemInstruction,
     max_tokens: settings.aiMaxOutputTokens || 2048,
     temperature: options.temperature ?? settings.aiTemperature ?? 0.7
   } : {
-    model: model,
+    model: requestModel,
     messages: [
       ...(options.systemInstruction ? [{ role: 'system', content: options.systemInstruction }] : []),
       { role: 'user', content: prompt }
@@ -88,33 +164,73 @@ const callAiUnified = async (prompt: string, options: AiConfigOptions = {}): Pro
     ...(options.responseMimeType === 'application/json' ? { response_format: { type: 'json_object' } } : {})
   };
 
-  const response = await fetch(baseUrl, {
-    method: 'POST',
-    headers: {
+  try {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
       ...(isAnthropic ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } : {})
-    },
-    body: JSON.stringify(requestBody)
-  });
+    };
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}) as any) as any;
-    throw new Error(errorData?.error?.message || `Erro do provedor AI: ${response.statusText}`);
+    if (!isAnthropic && provider !== 'ollama' && provider !== 'local-runner' && apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const response = await fetch(baseUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}) as any) as any;
+      throw new Error(errorData?.error?.message || `Erro do provedor AI: ${response.statusText}`);
+    }
+
+    const data = await response.json() as any;
+    return isAnthropic ? data.content[0].text : data.choices[0].message.content;
+  } catch (primaryError) {
+    // Fallback final para runner local OpenAI-compatible (VPS), quando OpenAI/Gemini/etc falharem.
+    if (provider !== 'local-runner') {
+      try {
+        const localBaseUrl = `${getLocalRunnerBaseUrl(settings)}/v1/chat/completions`;
+        const localBody = {
+          model: LOCAL_RUNNER_DEFAULT_MODEL,
+          messages: [
+            ...(options.systemInstruction ? [{ role: 'system', content: options.systemInstruction }] : []),
+            { role: 'user', content: prompt }
+          ],
+          temperature: options.temperature ?? settings.aiTemperature ?? 0.7,
+          max_tokens: settings.aiMaxOutputTokens || 2048,
+          top_p: settings.aiTopP || 0.95,
+        };
+
+        const localResponse = await fetch(localBaseUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localBody)
+        });
+
+        if (localResponse.ok) {
+          const localData = await localResponse.json() as any;
+          const localText = localData?.choices?.[0]?.message?.content;
+          if (typeof localText === 'string' && localText.trim()) {
+            return localText;
+          }
+        }
+      } catch (localFallbackError) {
+        console.warn('Fallback local runner falhou:', localFallbackError);
+      }
+    }
+
+    throw primaryError;
   }
-
-  const data = await response.json() as any;
-  return isAnthropic ? data.content[0].text : data.choices[0].message.content;
 };
 
 const getAiClient = (): GoogleGenAI => {
   const settings = getSettings();
-  // Prioriza a chave nas configurações locais (definida no Admin), fallback para env var de forma segura
-  const envApiKey = (typeof process !== 'undefined' && process.env) ? process.env.API_KEY : undefined;
-  const apiKey = settings.geminiApiKey ? settings.geminiApiKey.trim() : (envApiKey ? envApiKey.trim() : undefined);
+  const apiKey = getGeminiApiKey(settings);
 
   if (!apiKey || apiKey.length < 10) {
-    throw new Error("Chave de API do Gemini ausente ou muito curta. Verifique o Painel Administrativo.");
+    throw new Error("Chave Gemini ausente/inválida. Configure GEMINI_API_KEY no Painel Administrativo.");
   }
 
   return new GoogleGenAI({ apiKey });
@@ -183,15 +299,43 @@ export interface Product {
   error?: string;
 }
 
+const isShopeeLink = (value: string): boolean => {
+  const normalized = value.trim().toLowerCase();
+  return normalized.includes('shopee.com.br');
+};
+
+const resolveShopeeFromBackend = async (url: string): Promise<Product> => {
+  const endpoint = `/api/shopee/resolve?url=${encodeURIComponent(url)}`;
+  const response = await fetch(endpoint);
+  const payload = await response.json().catch(() => ({} as any)) as any;
+
+  if (!response.ok || !payload?.success || !payload?.data) {
+    throw new Error(payload?.error || 'Falha ao resolver URL da Shopee.');
+  }
+
+  const data = payload.data;
+  return {
+    title: data.title || 'Produto Shopee',
+    price: data.price || 'Preço indisponível',
+    image_url: data.image_url || 'https://placehold.co/600x600?text=Shopee',
+    product_url: data.product_url || url,
+  };
+};
+
 export const generateShopeeLinkFromApi = async (productUrl: string, affiliateId: string, subIds: string[]): Promise<string> => {
+  const settings = getSettings();
+  const defaultSubId = settings.shopeeDefaultSubId?.trim();
   const filteredSubIds = subIds.filter(id => id.trim() !== '');
+  const effectiveSubIds = filteredSubIds.length > 0
+    ? filteredSubIds
+    : (defaultSubId ? [defaultSubId] : []);
 
   const prompt = `
     Gere um link de afiliado da Shopee Brasil com base nas informações abaixo.
 
     URL do Produto: "${productUrl}"
     ID do Afiliado: "${affiliateId}"
-    ${filteredSubIds.length > 0 ? `Sub_IDs de Rastreamento: ${JSON.stringify(filteredSubIds)}` : ''}
+    ${effectiveSubIds.length > 0 ? `Sub_IDs de Rastreamento: ${JSON.stringify(effectiveSubIds)}` : ''}
 
     Instruções:
     1. Analise a URL do produto para extrair as informações necessárias.
@@ -217,6 +361,15 @@ export const generateShopeeLinkFromApi = async (productUrl: string, affiliateId:
 
 
 export const searchShopeeProductsFromApi = async (keyword: string): Promise<Product[]> => {
+  if (isShopeeLink(keyword)) {
+    try {
+      const product = await resolveShopeeFromBackend(keyword);
+      return [product];
+    } catch (fallbackError) {
+      console.warn('Fallback local de URL Shopee falhou, tentando IA:', fallbackError);
+    }
+  }
+
   const prompt = `
     Você é um especialista em buscar produtos na Shopee Brasil.
     Sua tarefa é encontrar produtos relevantes para a palavra-chave fornecida e retornar uma lista em formato JSON.
@@ -260,6 +413,17 @@ export const searchShopeeProductsFromApi = async (keyword: string): Promise<Prod
 
   } catch (error) {
     console.error("Error calling Gemini API for product search:", error);
+    // Se for link Shopee e a IA falhar (ex: cota), tenta resolver via backend.
+    if (isShopeeLink(keyword)) {
+      try {
+        const product = await resolveShopeeFromBackend(keyword);
+        return [product];
+      } catch (fallbackError) {
+        const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Erro no fallback de URL Shopee.';
+        throw new Error(`Falha ao buscar produtos: ${fallbackMessage}`);
+      }
+    }
+
     const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido na API.";
     throw new Error(`Falha ao buscar produtos: ${errorMessage}`);
   }
@@ -331,6 +495,12 @@ export const generateTelegramMessageFromApi = async (topic: string): Promise<str
 };
 
 export const getShopeeProductDetailsFromUrl = async (productUrl: string): Promise<Product> => {
+  try {
+    return await resolveShopeeFromBackend(productUrl);
+  } catch (fallbackError) {
+    console.warn('Fallback local de detalhes Shopee falhou, tentando IA:', fallbackError);
+  }
+
   const prompt = `
     Você é um assistente especialista em extrair informações de páginas de produtos da Shopee Brasil.
     Sua tarefa é analisar a URL de um produto e retornar seus detalhes em formato JSON.

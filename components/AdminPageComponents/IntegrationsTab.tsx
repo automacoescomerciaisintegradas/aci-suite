@@ -286,6 +286,27 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
               {shopeeValidation.message}
             </p>
           )}
+          <p className="text-xs text-dark-text-secondary mt-2">
+            O `sub_id` padrão de rastreio será usado automaticamente na geração de links Shopee.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="shopeeDefaultSubId" className="block text-sm font-medium text-dark-text-secondary mb-2">
+            Sub_ID Padrão Shopee (Rastreio)
+          </label>
+          <input
+            type="text"
+            id="shopeeDefaultSubId"
+            name="shopeeDefaultSubId"
+            value={localConfig.shopeeDefaultSubId}
+            onChange={handleInputChange}
+            className="w-full bg-slate-800 border border-dark-border rounded-lg p-3 text-dark-text-primary placeholder-gray-500 focus:ring-2 focus:ring-brand-primary focus:border-brand-primary transition duration-200"
+            placeholder="Ex: 45cf61a8-2faa-41dd-b261-8da24e16bf19"
+          />
+          <p className="text-xs text-dark-text-secondary mt-2">
+            Esse valor será enviado como `af_sub1` por padrão quando nenhum sub_id manual for informado.
+          </p>
         </div>
 
         {/* Amazon */}

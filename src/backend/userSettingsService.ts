@@ -3,10 +3,17 @@
 
 interface UserSettings {
     shopeeAffiliateId?: string;
+    shopeeDefaultSubId?: string;
     telegramBotToken?: string;
+    telegramChatId?: string;
     telegramBotUsername?: string;
     instagramToken?: string;
     instagramUsername?: string;
+    geminiApiKey?: string;
+    openaiApiKey?: string;
+    anthropicApiKey?: string;
+    groqApiKey?: string;
+    ollamaApiKey?: string;
 }
 
 class UserSettingsService {
@@ -15,6 +22,23 @@ class UserSettingsService {
     // Obter configurações do usuário
     getSettings(userId: string): UserSettings {
         return this.settings.get(userId) || {};
+    }
+
+    // Salvar configurações genéricas do usuário (merge)
+    saveSettings(userId: string, partial: Partial<UserSettings>): boolean {
+        try {
+            const currentSettings = this.getSettings(userId);
+            const nextSettings: UserSettings = {
+                ...currentSettings,
+                ...partial
+            };
+
+            this.settings.set(userId, nextSettings);
+            return true;
+        } catch (error) {
+            console.error('❌ Erro ao salvar configurações do usuário:', error);
+            return false;
+        }
     }
 
     // Salvar ID de Afiliado Shopee

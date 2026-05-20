@@ -2,9 +2,21 @@
 import { Router } from 'express';
 import { prisma } from '../prisma';
 import { authMiddleware } from '../auth';
-import { encrypt } from '../lib/crypto';
+import { userSettingsService } from '../userSettingsService';
 
 const router = Router();
+
+// Obter configurações salvas do usuário autenticado
+router.get('/me', authMiddleware, async (req: any, res) => {
+    try {
+        const userId = req.user.id;
+        const userSettings = userSettingsService.getSettings(userId);
+        return res.json({ success: true, data: userSettings });
+    } catch (error) {
+        console.error("Erro ao buscar configurações do usuário:", error);
+        return res.status(500).json({ success: false, error: "Erro ao buscar configurações do usuário" });
+    }
+});
 
 // Endpoint unificado para salvar configurações
 router.post('/', authMiddleware, async (req: any, res) => {
@@ -12,40 +24,45 @@ router.post('/', authMiddleware, async (req: any, res) => {
         const userId = req.user.id;
         const settings = req.body; // Objeto Settings completo do frontend
 
-        // Lista de providers de IA para salvar como Integration
-        const aiProviders = [
-            { key: 'openaiApiKey', provider: 'OPENAI' },
-            // Gemini não estava no enum ProviderType, mas o usuário quer salvar. 
-            // Se não estiver no enum, vai dar erro no Prisma.
-            // O schema tem: OPENAI, INSTAGRAM, TELEGRAM, SHOPEE, WORDPRESS, WOOCOMMERCE.
-            // Vou salvar apenas o que tem ProviderType correspondente por enquanto.
-        ];
+        // 0. Salvar em memória por usuário (funciona mesmo sem tabela de users configurada)
+        userSettingsService.saveSettings(userId, {
+            geminiApiKey: settings.geminiApiKey?.trim() || '',
+            openaiApiKey: settings.openaiApiKey?.trim() || '',
+            anthropicApiKey: settings.anthropicApiKey?.trim() || '',
+            groqApiKey: settings.groqApiKey?.trim() || '',
+            ollamaApiKey: settings.ollamaApiKey?.trim() || '',
+            telegramBotToken: settings.telegramBotToken?.trim() || '',
+            telegramChatId: settings.telegramChatId?.trim() || '',
+            shopeeAffiliateId: settings.shopeeAffiliateId?.trim() || '',
+            shopeeDefaultSubId: settings.shopeeDefaultSubId?.trim() || '',
+        });
 
-        // 1. Salvar OpenAI Key
-        if (settings.openaiApiKey) {
-            await upsertIntegration(userId, 'OPENAI', { apiKey: settings.openaiApiKey });
+        // 1. Tentar persistir também no banco (best-effort)
+        try {
+            // Salvar OpenAI Key (provider existente no enum)
+            if (settings.openaiApiKey) {
+                await upsertIntegration(userId, 'OPENAI', { apiKey: settings.openaiApiKey });
+            }
+
+            // Salvar Telegram
+            if (settings.telegramBotToken && settings.telegramChatId) {
+                await upsertIntegration(userId, 'TELEGRAM', {
+                    botToken: settings.telegramBotToken,
+                    chatId: settings.telegramChatId
+                });
+            }
+
+            // Salvar Shopee (Affiliate)
+            if (settings.shopeeAffiliateId) {
+                await upsertIntegration(userId, 'SHOPEE', {
+                    affiliateId: settings.shopeeAffiliateId
+                });
+            }
+        } catch (dbError) {
+            console.warn("⚠️ Não foi possível persistir settings no banco. Mantido em memória por usuário.", dbError);
         }
 
-        // 2. Salvar Telegram
-        if (settings.telegramBotToken && settings.telegramChatId) {
-            await upsertIntegration(userId, 'TELEGRAM', {
-                botToken: settings.telegramBotToken,
-                chatId: settings.telegramChatId
-            });
-        }
-
-        // 3. Salvar Shopee (Affiliate)
-        if (settings.shopeeAffiliateId) {
-            await upsertIntegration(userId, 'SHOPEE', {
-                affiliateId: settings.shopeeAffiliateId
-            });
-        }
-
-        // As outras chaves (Gemini, Anthropic, Groq, Ollama) que não tem Integration Type no schema
-        // não podem ser salvas no banco como Integration sem migração.
-        // Vou apenas logar por enquanto ou retornar sucesso parcial.
-
-        res.json({ success: true, message: "Configurações salvas no servidor" });
+        res.json({ success: true, message: "Configurações salvas e vinculadas ao usuário" });
 
     } catch (error: any) {
         console.error("Erro ao salvar configurações:", error);

@@ -8,6 +8,34 @@ interface User {
   isAdmin: boolean;
 }
 
+const SETTINGS_KEY = 'aci-settings';
+
+const hydrateAiSettingsForUser = (userSettings?: Record<string, any>) => {
+  if (!userSettings) return;
+
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const currentSettings = raw ? JSON.parse(raw) : {};
+
+    const merged = {
+      ...currentSettings,
+      geminiApiKey: userSettings.geminiApiKey ?? currentSettings.geminiApiKey ?? '',
+      openaiApiKey: userSettings.openaiApiKey ?? currentSettings.openaiApiKey ?? '',
+      anthropicApiKey: userSettings.anthropicApiKey ?? currentSettings.anthropicApiKey ?? '',
+      groqApiKey: userSettings.groqApiKey ?? currentSettings.groqApiKey ?? '',
+      ollamaApiKey: userSettings.ollamaApiKey ?? currentSettings.ollamaApiKey ?? '',
+      shopeeAffiliateId: userSettings.shopeeAffiliateId ?? currentSettings.shopeeAffiliateId ?? '',
+      shopeeDefaultSubId: userSettings.shopeeDefaultSubId ?? currentSettings.shopeeDefaultSubId ?? '45cf61a8-2faa-41dd-b261-8da24e16bf19',
+      telegramBotToken: userSettings.telegramBotToken ?? currentSettings.telegramBotToken ?? '',
+      telegramChatId: userSettings.telegramChatId ?? currentSettings.telegramChatId ?? '',
+    };
+
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+  } catch (error) {
+    console.error('Erro ao sincronizar settings do usuário após login:', error);
+  }
+};
+
 export const useAuth = (onLoginSuccess: (user: User, isNewUser?: boolean) => void) => {
   const [view, setView] = useState<'login' | 'signup' | 'pending-confirmation' | 'forgot-password'>('login');
   const [showPassword, setShowPassword] = useState(false);
@@ -140,6 +168,8 @@ export const useAuth = (onLoginSuccess: (user: User, isNewUser?: boolean) => voi
         // Log removido para produção
 
         // Login automático após signup
+        hydrateAiSettingsForUser(response.userSettings);
+
         const user = response.user;
         onLoginSuccess({
           name: user.full_name || user.display_name || 'Usuário ACI',
@@ -163,6 +193,18 @@ export const useAuth = (onLoginSuccess: (user: User, isNewUser?: boolean) => voi
         }
 
         console.log('Login successful:', response);
+
+        hydrateAiSettingsForUser(response.userSettings);
+
+        // Fallback: buscar settings no backend por usuário autenticado
+        try {
+          const settingsResponse = await apiClient.getUserSettings();
+          if (settingsResponse?.success && settingsResponse?.data) {
+            hydrateAiSettingsForUser(settingsResponse.data);
+          }
+        } catch (settingsError) {
+          console.warn('Não foi possível carregar settings do usuário no login:', settingsError);
+        }
 
         const user = response.user;
         onLoginSuccess({

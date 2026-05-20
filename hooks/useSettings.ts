@@ -4,6 +4,7 @@ export interface Settings {
     telegramBotToken: string;
     telegramChatId: string;
     shopeeAffiliateId: string;
+    shopeeDefaultSubId: string;
     amazonAffiliateId: string;
     mercadoLivreAffiliateId: string;
     whatsappWebhookUrl: string;
@@ -52,6 +53,7 @@ const defaultSettings: Settings = {
     telegramBotToken: '',
     telegramChatId: '',
     shopeeAffiliateId: '',
+    shopeeDefaultSubId: '45cf61a8-2faa-41dd-b261-8da24e16bf19',
     amazonAffiliateId: '',
     mercadoLivreAffiliateId: '',
     whatsappWebhookUrl: '',
