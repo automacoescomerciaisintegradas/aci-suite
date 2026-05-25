@@ -2,7 +2,7 @@ name: Auto Commit
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 3 * * *' # 03:00 UTC = 00:00 Fortaleza
   workflow_dispatch:
 
 permissions:
