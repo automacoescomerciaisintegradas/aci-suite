@@ -23,7 +23,8 @@ COPY package*.json ./
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 RUN npm ci --legacy-peer-deps
 COPY . .
-RUN npx prisma generate
+ENV DATABASE_URL="postgresql://user:pass@localhost:5432/db"
+RUN ./node_modules/.bin/prisma generate --schema ./prisma/schema.prisma
 # Compilar TypeScript para JavaScript
 RUN npm run build:server
 # =========================================
