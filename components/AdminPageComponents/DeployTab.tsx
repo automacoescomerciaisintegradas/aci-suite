@@ -11,7 +11,6 @@ export const DeployTab: React.FC = () => {
         setMessage(null);
 
         try {
-            // Usando a URL de deploy do EasyPanel fornecida pelo usuário
             const deployUrl = 'http://144.91.118.78:3000/api/deploy/4ab64faa6afac5a910b18f5b73c40e50569355ec85ce292a';
 
             // Note: Chamadas para IPs de rede local ou portas específicas podem sofrer bloqueio de CORS no navegador
@@ -30,16 +29,6 @@ export const DeployTab: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-                    <RocketIcon className="h-6 w-6 text-indigo-400" />
-                </div>
-                <div>
-                    <h2 className="text-xl font-bold text-white">Deploy & Produção</h2>
-                    <p className="text-sm text-slate-400">Gerencie a publicação das alterações no servidor oficial (EasyPanel).</p>
-                </div>
-            </div>
-
             <Card className="p-8 border-indigo-500/10 bg-indigo-500/5 overflow-hidden relative">
                 <div className="absolute -top-12 -right-12 w-48 h-48 bg-indigo-500/5 blur-[60px] rounded-full"></div>
 

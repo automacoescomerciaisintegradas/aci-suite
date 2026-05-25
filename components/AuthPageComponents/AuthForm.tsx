@@ -170,17 +170,16 @@ export const AuthForm: React.FC<AuthFormProps> = ({
         {view === 'login' ? '🔐 Área Segura' : '🎁 Ganhe R$ 10 em Créditos'}
       </div>
 
-      <div className="mb-8 mt-4">
-        <h2 className="text-3xl font-display font-bold text-white mb-2 uppercase tracking-tight">
-          {view === 'login' ? 'Acesso ao Painel' : 'Criar Conta Grátis'}
-        </h2>
-        <p className="text-gray-500 text-sm">
-          {view === 'login'
-            ? 'Digite suas credenciais para acessar'
-            : 'Preencha os dados e comece a automatizar!'
-          }
-        </p>
-      </div>
+      {view === 'signup' && (
+        <div className="mb-8 mt-4">
+          <h2 className="text-3xl font-display font-bold text-white mb-2 uppercase tracking-tight">
+            Criar Conta Grátis
+          </h2>
+          <p className="text-gray-500 text-sm">
+            Preencha os dados e comece a automatizar!
+          </p>
+        </div>
+      )}
 
       {/* Benefícios no signup */}
       {view === 'signup' && (

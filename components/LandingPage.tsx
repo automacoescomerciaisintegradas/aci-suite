@@ -21,17 +21,18 @@ const IntegrationIcon: React.FC<{ icon: React.ReactElement<{ className?: string 
 );
 
 const featureData = [
-    { icon: <BrainCircuitIcon className="h-8 w-8 text-lime-accent" />, title: 'Geração de Conteúdo com IA', description: 'Crie artigos, reviews e posts para blogs com IA, prontos para monetizar com produtos de afiliados.' },
-    { icon: <TelegramIcon className="h-8 w-8 text-lime-accent" />, title: 'Automação para Telegram', description: 'Envie ofertas em massa da Shopee para seus canais, com mensagens e links gerados automaticamente.' },
-    { icon: <ShoppingCartIcon className="h-8 w-8 text-lime-accent" />, title: 'Integração Shopee Afiliados', description: 'Pesquise produtos, encontre os mais vendidos e gere seus links de afiliado com um clique.' },
-    { icon: <InstagramIcon className="h-8 w-8 text-lime-accent" />, title: 'Análise de Instagram', description: 'Obtenha insights com IA sobre qualquer perfil público, com sugestões para crescimento e engajamento.' },
-    { icon: <ImageIcon className="h-8 w-8 text-lime-accent" />, title: 'Gerador de Imagens', description: 'Crie imagens únicas e de alta qualidade para suas redes sociais e blogs a partir de uma simples descrição.' },
-    { icon: <FileTextIcon className="h-8 w-8 text-lime-accent" />, title: 'Postagens Inteligentes', description: 'Importe uma planilha CSV de produtos e gere postagens de blog em massa para seu WordPress.' },
+    { icon: <BrainCircuitIcon className="h-8 w-8 text-brand-primary" />, title: 'Geração de Conteúdo com IA', description: 'Crie artigos, reviews e posts para blogs com IA, prontos para monetizar com produtos de afiliados.' },
+    { icon: <TelegramIcon className="h-8 w-8 text-brand-primary" />, title: 'Automação para Telegram', description: 'Envie ofertas em massa da Shopee para seus canais, com mensagens e links gerados automaticamente.' },
+    { icon: <ShoppingCartIcon className="h-8 w-8 text-brand-primary" />, title: 'Integração Shopee Afiliados', description: 'Pesquise produtos, encontre os mais vendidos e gere seus links de afiliado com um clique.' },
+    { icon: <InstagramIcon className="h-8 w-8 text-brand-primary" />, title: 'Análise de Instagram', description: 'Obtenha insights com IA sobre qualquer perfil público, com sugestões para crescimento e engajamento.' },
+    { icon: <ImageIcon className="h-8 w-8 text-brand-primary" />, title: 'Gerador de Imagens', description: 'Crie imagens únicas e de alta qualidade para suas redes sociais e blogs a partir de uma simples descrição.' },
+    { icon: <FileTextIcon className="h-8 w-8 text-brand-primary" />, title: 'Postagens Inteligentes', description: 'Importe uma planilha CSV de produtos e gere postagens de blog em massa para seu WordPress.' },
 ];
 
 const FeatureCard: React.FC<{ icon: React.ReactElement, title: string, description: string }> = ({ icon, title, description }) => (
-    <div className="bg-dark-card border border-dark-border p-6 rounded-xl transition-all duration-300 hover:border-lime-accent/30 hover:shadow-2xl hover:shadow-lime-accent/5">
-        <div className="mb-4">{icon}</div>
+    <div className="bg-dark-card border border-dark-border p-6 rounded-xl transition-all duration-300 hover:border-brand-primary/30 hover:shadow-[0_0_30px_rgba(99,102,241,0.15)] relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/5 to-brand-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        <div className="mb-4 relative z-10">{icon}</div>
         <h3 className="text-xl font-bold text-dark-text-primary mb-2">{title}</h3>
         <p className="text-sm text-dark-text-secondary">{description}</p>
     </div>
@@ -126,15 +127,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onAuthClick }) => {
                     <div className="absolute inset-0 bg-gradient-to-t from-dark-bg via-dark-bg/80 to-transparent z-10"></div>
                     
                     <div className="relative z-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center animate-fade-in">
-                        <h1 className="text-5xl md:text-7xl font-black text-dark-text-primary !leading-tight mb-6">
-                            Gere Conteúdo com <span className="text-lime-accent">IA</span>. Venda Automaticamente.
+                        <h1 className="text-5xl md:text-7xl font-black text-dark-text-primary !leading-tight mb-6 glow-title">
+                            Gere Conteúdo com <span className="bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-secondary">IA</span>. Venda Automaticamente.
                         </h1>
                         <p className="text-xl text-dark-text-secondary max-w-2xl mx-auto mb-10">
                             A plataforma completa para afiliados que desejam automatizar postagens no Telegram, Instagram e WordPress, e escalar suas comissões com a Shopee.
                         </p>
                         <button
                             onClick={onAuthClick}
-                            className="inline-flex items-center justify-center gap-3 bg-lime-accent text-dark-bg font-bold py-4 px-10 rounded-lg hover:opacity-90 transition-transform duration-300 hover:scale-105 shadow-2xl shadow-lime-accent/20 text-lg"
+                            className="inline-flex items-center justify-center gap-3 bg-gradient-to-r from-brand-primary to-brand-secondary text-white font-bold py-4 px-10 rounded-lg hover:opacity-90 transition-transform duration-300 hover:scale-105 shadow-[0_0_30px_rgba(99,102,241,0.4)] text-lg"
                         >
                             <RocketIcon className="h-6 w-6" />
                             Comece Gratuitamente
@@ -203,17 +204,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onAuthClick }) => {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                             <div>
-                                <p className="text-6xl font-black text-lime-accent">1.5M+</p>
+                                <p className="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-secondary">1.5M+</p>
                                 <h3 className="mt-2 text-xl font-bold text-dark-text-primary">Produtos Enviados</h3>
                                 <p className="mt-1 text-dark-text-secondary">Ofertas publicadas em canais de Telegram.</p>
                             </div>
                             <div>
-                                <p className="text-6xl font-black text-lime-accent">10k+</p>
+                                <p className="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-secondary">10k+</p>
                                 <h3 className="mt-2 text-xl font-bold text-dark-text-primary">Usuários Ativos</h3>
                                 <p className="mt-1 text-dark-text-secondary">Afiliados escalando seus resultados diariamente.</p>
                             </div>
                             <div>
-                                <p className="text-6xl font-black text-lime-accent">500k+</p>
+                                <p className="text-6xl font-black bg-clip-text text-transparent bg-gradient-to-r from-brand-primary to-brand-secondary">500k+</p>
                                 <h3 className="mt-2 text-xl font-bold text-dark-text-primary">Conteúdos Gerados</h3>
                                 <p className="mt-1 text-dark-text-secondary">Artigos e legendas criados com nossa IA.</p>
                             </div>

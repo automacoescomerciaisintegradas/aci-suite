@@ -15,7 +15,7 @@ export const WelcomeHero: React.FC = () => {
                 </div>
 
                 <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-[1.1] tracking-tighter">
-                    A suíte completa de ferramentas com <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">IA</span>
+                    A suíte completa de ferramentas com <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">IA</span>
                 </h1>
 
                 <p className="text-xl md:text-2xl text-slate-400 font-medium leading-relaxed max-w-3xl mb-12">
@@ -24,7 +24,7 @@ export const WelcomeHero: React.FC = () => {
 
                 <div className="flex flex-wrap gap-4">
                     <div className="flex items-center gap-3 px-6 py-3 bg-white/[0.03] border border-white/10 rounded-2xl">
-                        <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
                         <span className="text-slate-300 font-bold text-sm tracking-wide">Automação Comercial</span>
                     </div>
                     <div className="flex items-center gap-3 px-6 py-3 bg-white/[0.03] border border-white/10 rounded-2xl">
@@ -32,7 +32,7 @@ export const WelcomeHero: React.FC = () => {
                         <span className="text-slate-300 font-bold text-sm tracking-wide">Marketing de Afiliados</span>
                     </div>
                     <div className="flex items-center gap-3 px-6 py-3 bg-white/[0.03] border border-white/10 rounded-2xl">
-                        <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
                         <span className="text-slate-300 font-bold text-sm tracking-wide">Gestão de Conteúdo IA</span>
                     </div>
                 </div>

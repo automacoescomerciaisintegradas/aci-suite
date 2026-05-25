@@ -6,8 +6,14 @@ interface HeaderProps {
 
 const AciLogo: React.FC = () => (
     <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100" height="100" rx="20" fill="#CCFF00" />
-        <path d="M30 75V25L50 45L70 25V75" stroke="#0A0A0A" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+        <rect width="100" height="100" rx="20" fill="url(#logo-grad)" />
+        <defs>
+            <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#6366f1" />
+                <stop offset="100%" stopColor="#d946ef" />
+            </linearGradient>
+        </defs>
+        <path d="M30 75V25L50 45L70 25V75" stroke="#ffffff" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
 );
 
@@ -27,7 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ onAuthClick }) => (
             </div>
             <button
                 onClick={onAuthClick}
-                className="bg-lime-accent text-dark-bg text-sm font-bold px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity transform hover:scale-105 shadow-[0_4px_20px_rgba(204,255,0,0.5)]"
+                className="bg-gradient-to-r from-brand-primary to-brand-secondary text-white text-sm font-bold px-5 py-2.5 rounded-full hover:opacity-90 transition-opacity transform hover:scale-105 shadow-[0_4px_20px_rgba(99,102,241,0.5)]"
             >
                 Começar Agora
             </button>

@@ -20,9 +20,9 @@ export const FeaturedProductSection: React.FC<FeaturedProductSectionProps> = ({
 
       <div className="relative z-10">
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-pink-500/10 border border-pink-500/20 rounded-full mb-6">
-            <span className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></span>
-            <span className="text-pink-500 text-[10px] font-black uppercase tracking-widest">Destaque da Semana</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-purple-500/10 border border-indigo-500/30 rounded-full mb-6">
+            <span className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></span>
+            <span className="text-purple-500 text-[10px] font-black uppercase tracking-widest">Destaque da Semana</span>
           </div>
           <h2 className="text-4xl md:text-6xl font-black text-white leading-tight mb-6 tracking-tighter">
             Mini Impressora <span className="bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent">Portátil IA</span>
@@ -56,8 +56,8 @@ export const FeaturedProductSection: React.FC<FeaturedProductSectionProps> = ({
                     { label: 'Portabilidade Total', desc: 'Leve na palma da mão.' }
                   ].map((item, i) => (
                     <li key={i} className="flex gap-4">
-                      <div className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      <div className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-purple-500/20 flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
                       </div>
                       <div>
                         <span className="block text-sm font-bold text-white">{item.label}</span>
@@ -84,7 +84,7 @@ export const FeaturedProductSection: React.FC<FeaturedProductSectionProps> = ({
               href={affiliateLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="group/btn relative flex items-center justify-between p-1 pr-6 bg-orange-600 hover:bg-orange-500 rounded-2xl transition-all shadow-xl shadow-orange-900/20 overflow-hidden"
+              className="group/btn relative flex items-center justify-between p-1 pr-6 bg-emerald-600 hover:bg-purple-500 rounded-2xl transition-all shadow-xl shadow-indigo-500/20 overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent translate-x-[-100%] group-hover/btn:translate-x-[100%] transition-transform duration-700 pointer-events-none"></div>
               <div className="flex items-center gap-4">

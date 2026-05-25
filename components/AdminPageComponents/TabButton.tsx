@@ -1,12 +1,12 @@
 import React from 'react';
-import { KeyIcon, PlugIcon, BrainCircuitIcon, ClockIcon, ZapIcon, RocketIcon } from '../Icons.js';
+import { KeyIcon, PlugIcon, BrainCircuitIcon, ClockIcon, ZapIcon } from '../Icons.js';
 import { Button } from './StyledComponents';
 
 interface TabButtonProps {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-  tabType: 'apiKeys' | 'integrations' | 'ai' | 'cron' | 'automation' | 'deploy';
+  tabType: 'apiKeys' | 'integrations' | 'ai' | 'cron' | 'automation';
 }
 
 export const TabButton: React.FC<TabButtonProps> = ({ active, onClick, children, tabType }) => {
@@ -17,7 +17,6 @@ export const TabButton: React.FC<TabButtonProps> = ({ active, onClick, children,
       case 'ai': return <BrainCircuitIcon className="h-5 w-5" />;
       case 'cron': return <ClockIcon className="h-5 w-5" />;
       case 'automation': return <ZapIcon className="h-5 w-5" />;
-      case 'deploy': return <RocketIcon className="h-5 w-5" />;
       default: return null;
     }
   };

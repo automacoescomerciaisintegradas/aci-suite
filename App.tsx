@@ -254,10 +254,8 @@ const App: React.FC = () => {
   }, [isAuthenticated, handleNavigate]);
 
 
+  // Se não estiver autenticado, renderiza a nova página inicial (AuthPage)
   if (!isAuthenticated) {
-    if (view === 'landing') {
-      return <LandingPage onAuthClick={() => setView('auth')} />;
-    }
     return <AuthPage onLoginSuccess={handleLogin} onBackToLanding={() => setView('landing')} />;
   }
 
@@ -360,8 +358,7 @@ const App: React.FC = () => {
         return <ComingSoonPage title="WhatsApp Business" description="Conecte sua conta do WhatsApp Business para envio automático de mensagens, promoções e atendimento aos clientes." onNavigate={handleNavigate} />;
       case 'api-integration':
         return <ComingSoonPage title="Integração API" description="Acesse nossa API RESTful para integrar o ACI com suas próprias aplicações e automatizar processos." onNavigate={handleNavigate} />;
-      case 'ai-insights':
-        return <ComingSoonPage title="Análises com IA" description="Insights inteligentes sobre seus produtos, vendas e engajamento gerados por inteligência artificial." onNavigate={handleNavigate} />;
+
       case 'advanced-analytics':
         return <ComingSoonPage title="Analytics Avançado" description="Dashboards avançados com métricas detalhadas, comparativos e previsões de vendas." onNavigate={handleNavigate} />;
       case 'custom-automations':

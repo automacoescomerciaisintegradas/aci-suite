@@ -36,6 +36,145 @@ export default {
             // Inicializar cliente D1
             const db = new D1Client(env.DB);
             const auth = new D1Auth(db);
+            const hasValue = (value: unknown): boolean => {
+                if (value === null || value === undefined) return false;
+                if (typeof value === 'string') return value.trim().length > 0;
+                if (Array.isArray(value)) return value.length > 0;
+                if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+                return Boolean(value);
+            };
+            const computeStatus = (required: unknown[]): 'connected' | 'partial' | 'disconnected' => {
+                const checks = required.map(hasValue);
+                if (checks.every(Boolean)) return 'connected';
+                if (checks.some(Boolean)) return 'partial';
+                return 'disconnected';
+            };
+            const resolveUserId = (body?: Record<string, unknown> | null): string | null => {
+                const fromHeader = (request.headers.get('x-user-id') || '').trim();
+                const fromQuery = (url.searchParams.get('userId') || url.searchParams.get('id') || '').trim();
+                const fromBody = String(body?.userId || '').trim();
+                return fromHeader || fromQuery || fromBody || null;
+            };
+            const ensureUserSettingsTable = async () => {
+                await db.execute(`
+                    CREATE TABLE IF NOT EXISTS user_settings (
+                        user_id TEXT PRIMARY KEY,
+                        settings_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                `);
+            };
+
+            if (path === '/api/settings/me' && request.method === 'GET') {
+                const userId = resolveUserId();
+                if (!userId) return errorResponse('User ID required', 400);
+
+                await ensureUserSettingsTable();
+                const row = await db.first<{ settings_json: string }>(
+                    'SELECT settings_json FROM user_settings WHERE user_id = ?',
+                    [userId]
+                );
+
+                let data: Record<string, any> = {};
+                try {
+                    if (row?.settings_json) data = JSON.parse(row.settings_json);
+                } catch {
+                    data = {};
+                }
+
+                return jsonResponse({ success: true, data });
+            }
+
+            if (path === '/api/settings' && request.method === 'POST') {
+                const payload = await request.json() as Record<string, any>;
+                const userId = resolveUserId(payload);
+                if (!userId) return errorResponse('User ID required', 400);
+
+                await ensureUserSettingsTable();
+                const { userId: _discarded, ...settingsPayload } = payload || {};
+                const now = new Date().toISOString();
+
+                await db.execute(
+                    `INSERT INTO user_settings (user_id, settings_json, created_at, updated_at)
+                     VALUES (?, ?, ?, ?)
+                     ON CONFLICT(user_id) DO UPDATE SET
+                        settings_json = excluded.settings_json,
+                        updated_at = excluded.updated_at`,
+                    [userId, JSON.stringify(settingsPayload), now, now]
+                );
+
+                return jsonResponse({ success: true, message: 'Configurações salvas' });
+            }
+
+            if (path === '/api/integrations/status' && request.method === 'GET') {
+                const userId = resolveUserId();
+                if (!userId) return errorResponse('User ID required', 400);
+
+                await ensureUserSettingsTable();
+                const row = await db.first<{ settings_json: string }>(
+                    'SELECT settings_json FROM user_settings WHERE user_id = ?',
+                    [userId]
+                );
+
+                let settings: Record<string, any> = {};
+                try {
+                    if (row?.settings_json) settings = JSON.parse(row.settings_json);
+                } catch {
+                    settings = {};
+                }
+
+                let hasWordPressConnection = false;
+                let hasInstagramIntegration = false;
+                try {
+                    const wpRows = await db.query<{ id: string }>(
+                        'SELECT id FROM wordpress_connections WHERE user_id = ? LIMIT 1',
+                        [userId]
+                    );
+                    hasWordPressConnection = wpRows.length > 0;
+                } catch {
+                    hasWordPressConnection = false;
+                }
+                try {
+                    const igRows = await db.query<{ id: string }>(
+                        'SELECT id FROM instagram_integrations WHERE user_id = ? LIMIT 1',
+                        [userId]
+                    );
+                    hasInstagramIntegration = igRows.length > 0;
+                } catch {
+                    hasInstagramIntegration = false;
+                }
+
+                const telegramStatus = computeStatus([settings.telegramBotToken, settings.telegramChatId]);
+                const wordpressBySettings = computeStatus([settings.wordpressUrl, settings.wordpressUsername, settings.wordpressAppPassword]);
+                const wordpressStatus = hasWordPressConnection ? 'connected' : wordpressBySettings;
+                const instagramStatus = hasInstagramIntegration || hasValue(settings.instagramUser?.username) || hasValue(settings.instagramUsername)
+                    ? 'connected'
+                    : 'disconnected';
+                const woocommerceStatus = computeStatus([settings.woocommerceUrl, settings.woocommerceConsumerKey, settings.woocommerceConsumerSecret]);
+                const shopeeStatus = computeStatus([settings.shopeeAffiliateId]);
+                const whatsappOfficialStatus = computeStatus([settings.whatsappBusinessToken, settings.whatsappPhoneId]);
+                const whatsappUnofficialStatus = computeStatus([settings.whatsappWebhookUrl]);
+                const apiStatus = computeStatus([settings.apiRestBaseUrl, settings.apiRestToken]);
+                const n8nStatus = computeStatus([settings.n8nWebhookUrl]);
+
+                return jsonResponse({
+                    success: true,
+                    userId,
+                    updatedAt: new Date().toISOString(),
+                    integrations: {
+                        telegram: { id: 'telegram', status: telegramStatus, source: 'd1' },
+                        wordpress: { id: 'wordpress', status: wordpressStatus, source: 'd1' },
+                        instagram: { id: 'instagram', status: instagramStatus, source: 'd1' },
+                        woocommerce: { id: 'woocommerce', status: woocommerceStatus, source: 'd1' },
+                        shopee: { id: 'shopee', status: shopeeStatus, source: 'd1' },
+                        whatsapp_official: { id: 'whatsapp_official', status: whatsappOfficialStatus, source: 'd1' },
+                        whatsapp_unofficial: { id: 'whatsapp_unofficial', status: whatsappUnofficialStatus, source: 'd1' },
+                        api: { id: 'api', status: apiStatus, source: 'd1' },
+                        n8n: { id: 'n8n', status: n8nStatus, source: 'd1' },
+                    }
+                });
+            }
 
             // Rotas de autenticação
             if (path === '/api/auth/signup' && request.method === 'POST') {

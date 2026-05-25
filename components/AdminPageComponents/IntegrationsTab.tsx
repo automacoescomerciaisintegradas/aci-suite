@@ -74,7 +74,7 @@ export const IntegrationsTab: React.FC<IntegrationsTabProps> = ({
   return (
     <div>
       <h3 className="text-xl font-semibold">Configuração de Integrações</h3>
-      <p className="text-dark-text-secondary mb-8">Gerencie as chaves e IDs para integrações externas. As informações são salvas localmente no seu navegador.</p>
+      <p className="text-dark-text-secondary mb-8">Gerencie as chaves e IDs para integrações externas. As informações são salvas pela API interna da plataforma e sincronizadas com o navegador.</p>
 
       {/* Telegram Section */}
       <div className="space-y-6 p-6 bg-slate-800/50 rounded-lg border border-dark-border">

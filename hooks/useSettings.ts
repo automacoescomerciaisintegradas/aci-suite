@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '../src/services/apiClient';
 
 export interface Settings {
     telegramBotToken: string;
@@ -8,6 +9,8 @@ export interface Settings {
     amazonAffiliateId: string;
     mercadoLivreAffiliateId: string;
     whatsappWebhookUrl: string;
+    whatsappBusinessToken: string;
+    whatsappPhoneId: string;
     sendInterval: number;
     weeklyReportEnabled: boolean;
     weeklyReportCron: string;
@@ -30,6 +33,8 @@ export interface Settings {
     creditSpent: number; // Créditos já utilizados
     creditTransactions: Array<{ id: string, date: Date, type: 'purchase' | 'usage', amount: number, description: string }>; // Histórico de transações
     n8nWebhookUrl: string; // URL do webhook do n8n
+    apiRestBaseUrl: string;
+    apiRestToken: string;
     automationEnabled: boolean; // Se as automações estão habilitadas
     webhookTimeout: number; // Timeout para chamadas de webhook em segundos
     webhookRetries: number; // Número de tentativas para chamadas de webhook
@@ -44,8 +49,6 @@ export interface Settings {
     woocommerceUrl: string;
     woocommerceConsumerKey: string;
     woocommerceConsumerSecret: string;
-    supabaseUrl: string;
-    supabaseAnonKey: string;
     geminiApiKey: string;
 }
 
@@ -57,6 +60,8 @@ const defaultSettings: Settings = {
     amazonAffiliateId: '',
     mercadoLivreAffiliateId: '',
     whatsappWebhookUrl: '',
+    whatsappBusinessToken: '',
+    whatsappPhoneId: '',
     sendInterval: 5,
     weeklyReportEnabled: false,
     weeklyReportCron: '0 9 * * 1',
@@ -87,6 +92,8 @@ const defaultSettings: Settings = {
         }
     ],
     n8nWebhookUrl: '',
+    apiRestBaseUrl: '',
+    apiRestToken: '',
     automationEnabled: false,
     webhookTimeout: 30,
     webhookRetries: 3,
@@ -101,8 +108,6 @@ const defaultSettings: Settings = {
     woocommerceUrl: '',
     woocommerceConsumerKey: '',
     woocommerceConsumerSecret: '',
-    supabaseUrl: '',
-    supabaseAnonKey: '',
     geminiApiKey: '',
 };
 
@@ -113,20 +118,42 @@ export const useSettings = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        try {
-            const storedSettings = localStorage.getItem(SETTINGS_KEY);
-            if (storedSettings) {
-                // Merge stored settings with defaults to ensure new keys are present
-                const loadedSettings = JSON.parse(storedSettings);
-                setSettings({ ...defaultSettings, ...loadedSettings });
-            } else {
-                setSettings(defaultSettings);
+        const loadSettings = async () => {
+            let merged = defaultSettings;
+
+            try {
+                const storedSettings = localStorage.getItem(SETTINGS_KEY);
+                if (storedSettings) {
+                    const loadedSettings = JSON.parse(storedSettings);
+                    merged = { ...defaultSettings, ...loadedSettings };
+                    setSettings(merged);
+                } else {
+                    setSettings(defaultSettings);
+                }
+            } catch (error) {
+                console.error("Failed to load settings from localStorage", error);
             }
-        } catch (error) {
-            console.error("Failed to load settings from localStorage", error);
-        } finally {
-            setIsLoading(false);
-        }
+
+            // Fonte primária quando logado: API interna.
+            // Mantém localStorage como fallback/offline.
+            try {
+                const hasToken = !!localStorage.getItem('authToken');
+                if (hasToken) {
+                    const response = await apiClient.getUserSettings();
+                    if (response?.success && response?.data) {
+                        const backendMerged = { ...merged, ...response.data };
+                        localStorage.setItem(SETTINGS_KEY, JSON.stringify(backendMerged));
+                        setSettings(backendMerged);
+                    }
+                }
+            } catch (error) {
+                console.warn('Falha ao sincronizar settings via API interna. Mantendo fallback local.', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        void loadSettings();
     }, []);
 
     const saveSettings = useCallback((newSettings: Settings) => {
@@ -140,6 +167,12 @@ export const useSettings = () => {
 
             localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
             setSettings(updatedSettings);
+
+            // Best-effort: sincroniza no backend quando autenticado.
+            const hasToken = !!localStorage.getItem('authToken');
+            if (hasToken) {
+                void apiClient.saveUserSettings(updatedSettings as unknown as Record<string, any>);
+            }
         } catch (error) {
             console.error("Failed to save settings to localStorage", error);
         }

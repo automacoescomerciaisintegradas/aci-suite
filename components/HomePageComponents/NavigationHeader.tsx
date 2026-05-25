@@ -34,7 +34,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onNavigate }
             description: 'Métricas e insights',
             page: 'analytics' as Page,
             icon: <TrendingUpIcon className="h-6 w-6" />,
-            color: 'from-emerald-500 to-teal-600'
+            color: 'from-indigo-500 to-purple-600'
         },
         {
             title: 'Segurança',
@@ -102,7 +102,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({ onNavigate }
                         <p className="text-xs text-dark-text-secondary">Ferramentas</p>
                     </div>
                     <div>
-                        <p className="text-2xl font-bold text-emerald-400">100%</p>
+                        <p className="text-2xl font-bold text-indigo-400">100%</p>
                         <p className="text-xs text-dark-text-secondary">Automação</p>
                     </div>
                     <div>

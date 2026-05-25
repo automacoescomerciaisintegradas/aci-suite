@@ -24,6 +24,20 @@ interface IntegrationCard {
     status: 'connected' | 'disconnected' | 'partial';
 }
 
+interface CardRuntimeState {
+    loading: boolean;
+    error: string | null;
+    checkedAt: number | null;
+    remoteHealthy: boolean | null;
+}
+
+interface BackendIntegrationStatus {
+    id: string;
+    status: 'connected' | 'disconnected' | 'partial';
+    details?: string;
+    source?: string;
+}
+
 export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavigate }) => {
     const { settings, saveSettings } = useSettings();
     const { validateTelegramToken, validateWordPressConnection, validateWooCommerceConnection } = useExternalValidations();
@@ -36,6 +50,13 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [showIgConsent, setShowIgConsent] = useState(false);
     const [igConsentConfirmed, setIgConsentConfirmed] = useState(false);
+    const [cardRuntimeState, setCardRuntimeState] = useState<Record<string, CardRuntimeState>>({});
+    const [backendStatuses, setBackendStatuses] = useState<Record<string, BackendIntegrationStatus>>({});
+    const [backendStatusesLoading, setBackendStatusesLoading] = useState(false);
+
+    const MONITORED_RUNTIME_IDS: string[] = ['telegram', 'wordpress', 'instagram', 'woocommerce', 'shopee', 'whatsapp_official', 'whatsapp_unofficial', 'api', 'n8n'];
+    const CARD_IDS: string[] = ['telegram', 'wordpress', 'instagram', 'woocommerce', 'shopee', 'whatsapp_official', 'whatsapp_unofficial', 'api', 'n8n'];
+    const STATUS_REFRESH_MS = 45000;
 
     useEffect(() => {
         setLocalSettings(settings);
@@ -60,29 +81,96 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
         }
     }, []);
 
-    // Verificar status das integrações
-    const getIntegrationStatus = (integration: string): 'connected' | 'disconnected' | 'partial' => {
-        switch (integration) {
-            case 'telegram':
-                return settings.telegramBotToken && settings.telegramChatId ? 'connected' :
-                    settings.telegramBotToken || settings.telegramChatId ? 'partial' : 'disconnected';
-            case 'wordpress':
-                return settings.wordpressUrl && settings.wordpressUsername && settings.wordpressAppPassword ? 'connected' :
-                    settings.wordpressUrl ? 'partial' : 'disconnected';
-            case 'instagram':
-                return settings.instagramUser ? 'connected' : 'disconnected';
-            case 'shopee':
-                return settings.shopeeAffiliateId ? 'connected' : 'disconnected';
-            case 'woocommerce':
-                // Se houve uma validação expressa e falhou, marca como desconectado (vermelho)
-                if (validationStatus.woocommerce?.status === 'invalid') return 'disconnected';
+    const patchCardRuntimeState = (id: string, patch: Partial<CardRuntimeState>) => {
+        setCardRuntimeState(prev => ({
+            ...prev,
+            [id]: {
+                loading: false,
+                error: null,
+                checkedAt: null,
+                remoteHealthy: null,
+                ...(prev[id] || {}),
+                ...patch,
+            },
+        }));
+    };
 
-                return settings.woocommerceUrl && settings.woocommerceConsumerKey && settings.woocommerceConsumerSecret ? 'connected' :
-                    settings.woocommerceUrl ? 'partial' : 'disconnected';
-            default:
-                return 'disconnected';
+    const getIntegrationStatus = (integrationId: string): 'connected' | 'disconnected' | 'partial' => {
+        return backendStatuses[integrationId]?.status || 'disconnected';
+    };
+
+    const refreshAllIntegrationStatuses = async (silent = false, deep = false) => {
+        if (!silent) {
+            setBackendStatusesLoading(true);
+            CARD_IDS.forEach((id) => patchCardRuntimeState(id, { loading: true, error: null }));
+        }
+
+        try {
+            const response = await apiClient.getIntegrationsStatus({ deep });
+            const integrationMap = (response?.integrations || {}) as Record<string, BackendIntegrationStatus>;
+            setBackendStatuses(integrationMap);
+
+            CARD_IDS.forEach((id) => {
+                const status = integrationMap[id];
+                patchCardRuntimeState(id, {
+                    loading: false,
+                    error: status ? null : 'Status indisponível no backend',
+                    checkedAt: Date.now(),
+                    remoteHealthy: status ? status.status !== 'disconnected' : false,
+                });
+            });
+        } catch (error: any) {
+            const message = error?.message || 'Falha ao carregar status de integrações';
+            CARD_IDS.forEach((id) => patchCardRuntimeState(id, {
+                loading: false,
+                error: message,
+                checkedAt: Date.now(),
+                remoteHealthy: false,
+            }));
+        } finally {
+            setBackendStatusesLoading(false);
         }
     };
+
+    const retrySingleIntegrationStatus = async (integrationId: string) => {
+        patchCardRuntimeState(integrationId, { loading: true, error: null });
+        try {
+            const response = await apiClient.getIntegrationsStatus({ deep: true });
+            const integrationMap = (response?.integrations || {}) as Record<string, BackendIntegrationStatus>;
+            if (integrationMap[integrationId]) {
+                setBackendStatuses(prev => ({ ...prev, [integrationId]: integrationMap[integrationId] }));
+                patchCardRuntimeState(integrationId, {
+                    loading: false,
+                    error: null,
+                    checkedAt: Date.now(),
+                    remoteHealthy: integrationMap[integrationId].status !== 'disconnected',
+                });
+                return;
+            }
+            patchCardRuntimeState(integrationId, {
+                loading: false,
+                error: 'Integração não retornada pelo backend',
+                checkedAt: Date.now(),
+                remoteHealthy: false,
+            });
+        } catch (error: any) {
+            patchCardRuntimeState(integrationId, {
+                loading: false,
+                error: error?.message || 'Falha no retry do status',
+                checkedAt: Date.now(),
+                remoteHealthy: false,
+            });
+        }
+    };
+
+    useEffect(() => {
+        void refreshAllIntegrationStatuses(false, true);
+        const timer = window.setInterval(() => {
+            void refreshAllIntegrationStatuses(true, false);
+        }, STATUS_REFRESH_MS);
+
+        return () => window.clearInterval(timer);
+    }, []);
 
     const integrations: IntegrationCard[] = [
         {
@@ -130,13 +218,22 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
             status: getIntegrationStatus('shopee'),
         },
         {
-            id: 'whatsapp',
-            name: 'WhatsApp Business',
-            description: 'Envie mensagens e promoções para seus clientes',
+            id: 'whatsapp_official',
+            name: 'WhatsApp Oficial',
+            description: 'Cloud API oficial da Meta (token + phone_id)',
             icon: <span className="text-3xl">📱</span>,
             color: 'from-green-500 to-green-600',
             page: 'whatsapp-business',
-            status: 'disconnected',
+            status: getIntegrationStatus('whatsapp_official'),
+        },
+        {
+            id: 'whatsapp_unofficial',
+            name: 'WhatsApp Não Oficial',
+            description: 'Webhook de automação (n8n/Make/Zapier)',
+            icon: <span className="text-3xl">💬</span>,
+            color: 'from-emerald-500 to-teal-600',
+            page: 'whatsapp-business',
+            status: getIntegrationStatus('whatsapp_unofficial'),
         },
         {
             id: 'api',
@@ -145,7 +242,7 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
             icon: <LinkIcon className="h-8 w-8 text-white" />,
             color: 'from-purple-600 to-indigo-600',
             page: 'api-integration',
-            status: 'disconnected',
+            status: getIntegrationStatus('api'),
         },
         {
             id: 'n8n',
@@ -154,7 +251,7 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
             icon: <ZapIcon className="h-8 w-8 text-white" />,
             color: 'from-red-500 to-orange-500',
             page: 'automation',
-            status: 'disconnected',
+            status: getIntegrationStatus('n8n'),
         },
     ];
 
@@ -165,11 +262,15 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
     const handleSaveIntegration = async (integrationId: string) => {
         setSaveStatus('saving');
         try {
-            await saveSettings(localSettings);
+            saveSettings(localSettings);
+            await apiClient.saveUserSettings(localSettings as unknown as Record<string, any>);
             setSaveStatus('success');
+            await refreshAllIntegrationStatuses(false, true);
             setTimeout(() => setSaveStatus('idle'), 2000);
-        } catch (error) {
+        } catch (error: any) {
             setSaveStatus('error');
+            setErrorMessage(error?.message || 'Falha ao salvar integração no backend');
+            setTimeout(() => setErrorMessage(null), 5000);
         }
     };
 
@@ -213,7 +314,26 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
         }
     };
 
-    const getStatusBadge = (status: 'connected' | 'disconnected' | 'partial') => {
+    const getEffectiveStatus = (integration: IntegrationCard): 'connected' | 'disconnected' | 'partial' => {
+        const runtime = cardRuntimeState[integration.id];
+        if (!runtime) return integration.status;
+
+        if (runtime.loading) return integration.status;
+        if (runtime.error && integration.status === 'connected') return 'partial';
+
+        return integration.status;
+    };
+
+    const getStatusBadge = (status: 'connected' | 'disconnected' | 'partial', isLoading = false) => {
+        if (isLoading) {
+            return (
+                <span className="flex items-center gap-1 text-xs font-medium text-blue-300 bg-blue-500/10 px-2 py-1 rounded-full border border-blue-500/20">
+                    <SpinnerIcon className="h-3 w-3 animate-spin" />
+                    Verificando
+                </span>
+            );
+        }
+
         switch (status) {
             case 'connected':
                 return (
@@ -644,6 +764,13 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
                 </div>
             )}
 
+            {backendStatusesLoading && (
+                <div className="mb-6 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center gap-3 text-blue-300 animate-slide-up">
+                    <SpinnerIcon className="h-4 w-4 animate-spin" />
+                    <p className="text-sm font-medium">Sincronizando status real das integrações no backend...</p>
+                </div>
+            )}
+
             {/* Grid de Integrações Imagem */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
                 {integrations.map((integration) => (
@@ -669,11 +796,32 @@ export const IntegrationsHubPage: React.FC<IntegrationsHubPageProps> = ({ onNavi
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-1">
                                         <h3 className="font-semibold text-white">{integration.name}</h3>
-                                        {getStatusBadge(integration.status)}
+                                        {getStatusBadge(getEffectiveStatus(integration), !!cardRuntimeState[integration.id]?.loading)}
                                     </div>
                                     <p className="text-sm text-dark-text-secondary line-clamp-2">
                                         {integration.description}
                                     </p>
+                                    {cardRuntimeState[integration.id]?.error && (
+                                        <div className="mt-2 flex items-center justify-between gap-2">
+                                            <p className="text-xs text-red-300 truncate">
+                                                {cardRuntimeState[integration.id]?.error}
+                                            </p>
+                                            <button
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    void retrySingleIntegrationStatus(integration.id);
+                                                }}
+                                                className="px-2 py-1 text-[10px] rounded-md bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20 transition-colors"
+                                            >
+                                                Tentar novamente
+                                            </button>
+                                        </div>
+                                    )}
+                                    {!cardRuntimeState[integration.id]?.error && cardRuntimeState[integration.id]?.checkedAt && MONITORED_RUNTIME_IDS.includes(integration.id) && (
+                                        <p className="text-[10px] text-dark-text-secondary mt-2">
+                                            Atualizado agora
+                                        </p>
+                                    )}
                                 </div>
                                 <ChevronRightIcon className={`h-5 w-5 text-dark-text-secondary transition-transform ${expandedCard === integration.id ? 'rotate-90' : ''
                                     }`} />

@@ -12,14 +12,20 @@
 // - Fora do navegador (SSR/scripts), usa API_URL ou localhost:4001.
 const API_BASE_URL = (() => {
     const envApiUrl = typeof import.meta !== 'undefined' ? import.meta.env?.VITE_API_URL?.trim() : '';
+    const sanitize = (url: string) => url.replace(/\/+$/, '');
+    const isLocalhostHost = (host: string) => host === 'localhost' || host === '127.0.0.1';
+    const isLocalApiUrl = (url: string) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(sanitize(url));
+
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-            return 'http://localhost:4001';
+        if (isLocalhostHost(hostname) && envApiUrl && !isLocalApiUrl(envApiUrl)) {
+            // Em dev local, evita CORS usando proxy do Vite quando VITE_API_URL aponta para ambiente remoto.
+            return '';
         }
-        return envApiUrl || '';
+        return envApiUrl ? sanitize(envApiUrl) : '';
     }
-    return process.env.API_URL || 'http://localhost:4001';
+
+    return sanitize(process.env.API_URL || 'http://localhost:4001');
 })();
 
 // Debug: mostrar qual URL está sendo usada
@@ -100,6 +106,16 @@ class UniversalApiClient {
         return this.userId;
     }
 
+    private async isLocalBackendAvailable(): Promise<boolean> {
+        if (typeof window === 'undefined') return true;
+        try {
+            const response = await fetch('http://localhost:4001/health', { method: 'GET' });
+            return response.ok;
+        } catch {
+            return false;
+        }
+    }
+
 
     private async request<T = any>(
         endpoint: string,
@@ -111,6 +127,7 @@ class UniversalApiClient {
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(this.userId ? { 'X-User-Id': this.userId } : {}),
             ...options.headers,
         };
 
@@ -121,17 +138,58 @@ class UniversalApiClient {
                 ...options,
                 headers,
             });
+            const rawBody = await response.text();
+            let data: any = null;
 
-            const data = await response.json() as any;
+            if (rawBody) {
+                try {
+                    data = JSON.parse(rawBody);
+                } catch {
+                    data = null;
+                }
+            }
 
             // console.log('🟢 Response:', { status: response.status, ok: response.ok, data });
 
             if (!response.ok) {
-                throw new Error(data.error || `HTTP ${response.status}`);
+                if (
+                    response.status === 500 &&
+                    !rawBody &&
+                    typeof window !== 'undefined' &&
+                    this.baseUrl === ''
+                ) {
+                    const backendUp = await this.isLocalBackendAvailable();
+                    if (!backendUp) {
+                        throw new Error('Backend local indisponivel em http://localhost:4001. Inicie com `npm run server` (ou `npm run dev`).');
+                    }
+                }
+
+                const snippet = rawBody ? ` - ${rawBody.slice(0, 180)}` : '';
+                const message = data?.error || `HTTP ${response.status}${snippet}`;
+                throw new Error(message);
+            }
+
+            if (!rawBody) {
+                return {} as T;
+            }
+
+            if (data === null) {
+                throw new Error(`Resposta inválida da API (esperado JSON). HTTP ${response.status}`);
             }
 
             return data as T;
         } catch (error: any) {
+            if (
+                typeof window !== 'undefined' &&
+                this.baseUrl === '' &&
+                error instanceof TypeError &&
+                /fetch/i.test(error.message || '')
+            ) {
+                const backendUp = await this.isLocalBackendAvailable();
+                if (!backendUp) {
+                    throw new Error('Backend local indisponivel em http://localhost:4001. Inicie com `npm run server` (ou `npm run dev`).');
+                }
+            }
             console.error('API request error:', error);
             throw error;
         }
@@ -378,7 +436,7 @@ class UniversalApiClient {
         const id = userId || this.userId;
         if (!id) throw new Error('User ID not available');
 
-        return await this.request(`/api/settings/user?userId=${id}`);
+        return await this.request(`/api/settings/me?userId=${id}`);
     }
 
     async updateUserSettings(data: {
@@ -392,10 +450,18 @@ class UniversalApiClient {
         const userId = data.userId || this.userId;
         if (!userId) throw new Error('User ID not available');
 
-        return await this.request('/api/settings/update', {
-            method: 'PUT',
+        return await this.request('/api/settings', {
+            method: 'POST',
             body: JSON.stringify({ ...data, userId }),
         });
+    }
+
+    async getIntegrationsStatus(options?: { deep?: boolean; userId?: string }) {
+        const params = new URLSearchParams();
+        if (options?.deep) params.set('deep', 'true');
+        if (options?.userId || this.userId) params.set('userId', options?.userId || this.userId || '');
+        const query = params.toString();
+        return await this.request(`/api/integrations/status${query ? `?${query}` : ''}`);
     }
 }
 

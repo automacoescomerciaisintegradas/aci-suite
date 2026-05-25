@@ -1,0 +1,44 @@
+name: Auto Commit
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-commit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auto_commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Make random commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          num_commits=$(shuf -i 1-5 -n 1)
+          echo "Generating ${num_commits} commit(s)..."
+
+          for i in $(seq 1 "$num_commits"); do
+            ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            file="commit_file_${i}.txt"
+            echo "Auto commit #${i} - ${ts}" >> "$file"
+            git add "$file"
+            git commit -m "Auto commit #${i} - ${ts}"
+          done
+
+      - name: Push changes
+        run: git push origin HEAD:main

@@ -1,0 +1,828 @@
+openapi: 3.0.3
+info:
+  title: ACI Suite API
+  version: 1.0.0-draft
+  description: >
+    Rascunho OpenAPI v1 baseado na matriz de baseline da Fase 0.
+    Backend canônico alvo: Express (`src/backend/server.ts`).
+    Endpoints com gap no Express estão marcados com `x-implementation: missing`.
+
+servers:
+  - url: http://localhost:4001
+    description: Local (Express)
+  - url: https://aci.automacoescomerciais.com.br
+    description: Produção
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Credits
+  - name: Settings
+  - name: Payments
+  - name: Integrations
+  - name: Blogs
+  - name: Affiliate
+  - name: Metrics
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check do backend Express
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /api/auth/signup:
+    post:
+      tags: [Auth]
+      summary: Cadastro de usuário
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "200":
+          description: Usuário cadastrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login realizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSuccessResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Solicitar recuperação de senha
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        "200":
+          description: Solicitação processada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/validate-reset-token:
+    post:
+      tags: [Auth]
+      summary: Validar token de recuperação
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        "200":
+          description: Token válido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  email:
+                    type: string
+                    format: email
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Redefinir senha
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 6
+      responses:
+        "200":
+          description: Senha alterada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/user:
+    get:
+      tags: [Auth]
+      summary: Obter usuário por id
+      description: Endpoint consumido pelo frontend e ausente no Express atual.
+      x-implementation: missing
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Usuário encontrado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/auth/profile:
+    put:
+      tags: [Auth]
+      summary: Atualizar perfil do usuário
+      description: Endpoint consumido pelo frontend e ausente no Express atual.
+      x-implementation: missing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                full_name:
+                  type: string
+                display_name:
+                  type: string
+                phone:
+                  type: string
+                avatar_url:
+                  type: string
+      responses:
+        "200":
+          description: Perfil atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessageResponse"
+
+  /api/credits/balance:
+    get:
+      tags: [Credits]
+      summary: Obter saldo de créditos
+      parameters:
+        - in: query
+          name: userId
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Saldo retornado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+                    example: 3000
+                  credits:
+                    type: object
+                    nullable: true
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/credits/add:
+    post:
+      tags: [Credits]
+      summary: Adicionar créditos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: number
+                  minimum: 0.01
+      responses:
+        "200":
+          description: Créditos adicionados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/credits/transactions:
+    get:
+      tags: [Credits]
+      summary: Histórico de transações de créditos
+      description: Endpoint consumido pelo frontend e ausente no Express atual.
+      x-implementation: missing
+      parameters:
+        - in: query
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Histórico retornado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  transactions:
+                    type: array
+                    items:
+                      type: object
+
+  /api/settings/me:
+    get:
+      tags: [Settings]
+      summary: Obter configurações do usuário autenticado
+      responses:
+        "200":
+          description: Configurações retornadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/settings:
+    post:
+      tags: [Settings]
+      summary: Salvar configurações do usuário autenticado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Configurações salvas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessageResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/shopee/resolve:
+    get:
+      tags: [Affiliate]
+      summary: Resolver metadados de link público da Shopee
+      security: []
+      parameters:
+        - in: query
+          name: url
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Link resolvido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      title:
+                        type: string
+                      price:
+                        type: string
+                      image_url:
+                        type: string
+                      product_url:
+                        type: string
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/payments/create-pix:
+    post:
+      tags: [Payments]
+      summary: Criar pagamento PIX
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                packageId:
+                  type: string
+                description:
+                  type: string
+      responses:
+        "200":
+          description: Pagamento criado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/payments/status/{paymentId}:
+    get:
+      tags: [Payments]
+      summary: Consultar status de pagamento
+      parameters:
+        - in: path
+          name: paymentId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Status retornado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/payments/process_payment:
+    post:
+      tags: [Payments]
+      summary: Processar pagamento (Mercado Pago)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Pagamento processado
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/payments/packages:
+    get:
+      tags: [Payments]
+      summary: Listar pacotes de créditos
+      responses:
+        "200":
+          description: Pacotes retornados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  packages:
+                    type: array
+                    items:
+                      type: object
+
+  /api/packages:
+    get:
+      tags: [Payments]
+      summary: Alias legado para pacotes
+      description: Endpoint consumido pelo frontend e ausente no Express atual.
+      x-implementation: missing
+      responses:
+        "200":
+          description: Pacotes retornados
+
+  /api/integrations/instagram/auth:
+    get:
+      tags: [Integrations]
+      summary: Iniciar OAuth Instagram/Meta
+      responses:
+        "200":
+          description: URL de autenticação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  url:
+                    type: string
+
+  /api/integrations/instagram/callback:
+    get:
+      tags: [Integrations]
+      summary: Callback OAuth Instagram/Meta
+      security: []
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+        - in: query
+          name: state
+          schema:
+            type: string
+      responses:
+        "302":
+          description: Redirecionamento para frontend
+
+  /api/integrations/instagram/post:
+    post:
+      tags: [Integrations]
+      summary: Publicar post no Instagram
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Publicação realizada
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/integrations/instagram/comment/auto-reply:
+    post:
+      tags: [Integrations]
+      summary: Configurar/acionar auto-resposta de comentários
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Operação concluída
+
+  /api/integrations/woocommerce/validate:
+    post:
+      tags: [Integrations]
+      summary: Validar conexão WooCommerce
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url, consumerKey, consumerSecret]
+              properties:
+                url:
+                  type: string
+                consumerKey:
+                  type: string
+                consumerSecret:
+                  type: string
+      responses:
+        "200":
+          description: Resultado da validação
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/blogs:
+    get:
+      tags: [Blogs]
+      summary: Listar blogs do usuário
+      responses:
+        "200":
+          description: Blogs retornados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  blogs:
+                    type: array
+                    items:
+                      type: object
+    post:
+      tags: [Blogs]
+      summary: Criar conexão de blog
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Blog adicionado
+    delete:
+      tags: [Blogs]
+      summary: Remover blog
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Blog removido
+
+  /api/blogs/validate:
+    post:
+      tags: [Blogs]
+      summary: Validar credenciais do blog
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Resultado da validação
+
+  /api/blogs/{id}/test:
+    post:
+      tags: [Blogs]
+      summary: Testar conexão de blog já cadastrada
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Teste concluído
+
+  /api/blogs/{id}/publish:
+    post:
+      tags: [Blogs]
+      summary: Publicar conteúdo em blog
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                status:
+                  type: string
+                categories:
+                  type: array
+                  items:
+                    type: integer
+                tags:
+                  type: array
+                  items:
+                    type: integer
+                scheduledDate:
+                  type: string
+      responses:
+        "200":
+          description: Publicado com sucesso
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/content/generate:
+    post:
+      tags: [Affiliate]
+      summary: Gerar conteúdo com IA para produto/blog
+      description: Endpoint consumido no frontend, rota existe mas não está montada no Express.
+      x-implementation: missing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: Conteúdo gerado
+
+  /api/metrics/cache:
+    get:
+      tags: [Metrics]
+      summary: Métricas de cache
+      responses:
+        "200":
+          description: Métricas retornadas
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Requisição inválida
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Não autenticado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Recurso não encontrado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    SignupRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        metadata:
+          type: object
+          properties:
+            full_name:
+              type: string
+            phone:
+              type: string
+            role:
+              type: string
+              enum: [user, admin]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        display_name:
+          type: string
+        role:
+          type: string
+        avatar_url:
+          type: string
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+        userSettings:
+          type: object
+          additionalProperties: true
+
+    SuccessMessageResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        error:
+          type: string

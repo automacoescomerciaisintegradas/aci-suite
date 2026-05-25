@@ -35,7 +35,7 @@ export const ApiKeysTab: React.FC<ApiKeysTabProps> = ({ localConfig, handleInput
     <div>
       <h3 className="text-lg font-semibold text-[#d0d2d6] mb-2">Gerenciamento de Chaves de API</h3>
       <p className="text-[#b4b7bd] text-sm mb-6">
-        Adicione suas chaves de API de diferentes provedores. Elas são salvas localmente no seu navegador e nunca são enviadas para nossos servidores.
+        Adicione suas chaves de API de diferentes provedores. Elas são salvas no navegador e, quando você estiver logado, também vinculadas à sua conta para sincronização entre sessões.
       </p>
       <div className="space-y-6">
         <Card className="p-6">

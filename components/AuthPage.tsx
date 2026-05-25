@@ -129,6 +129,15 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
     { q: 'Posso publicar em múltiplas plataformas?', a: 'Sim! Nossa plataforma suporta publicação simultânea no Telegram, WordPress, Instagram e outras redes sociais.' },
   ];
 
+  const scrollToSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const openAuthView = (targetView: 'login' | 'signup' | 'pending-confirmation' | 'forgot-password') => {
+    setView(targetView);
+    window.setTimeout(() => scrollToSection('acesso'), 80);
+  };
+
   return (
     <div className="min-h-screen bg-neutrals-background_main font-body text-white selection:bg-brand-primary selection:text-black overflow-x-hidden">
       <style>{`
@@ -143,7 +152,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
         }
       `}</style>
 
-      <AuthHeader onBackToLanding={onBackToLanding} setView={setView} />
+      <AuthHeader onBackToLanding={onBackToLanding} setView={openAuthView} />
 
       {/* Hero Section - Bold & Impactful */}
       <section className="relative pt-40 pb-32 lg:pt-64 lg:pb-48 min-h-screen flex flex-col justify-center overflow-hidden">
@@ -153,7 +162,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
         <div className="container mx-auto px-6 lg:px-16 relative z-10">
           <div className="flex flex-col lg:flex-row items-center gap-20">
             {/* Hero Text */}
-            <div className="lg:w-1/2 text-center lg:text-left">
+            <div className="w-full max-w-4xl mx-auto text-center flex flex-col items-center">
               <div className="inline-flex items-center gap-3 px-4 py-1.5 border border-brand-secondary/30 bg-brand-secondary/10 text-brand-secondary text-xs font-bold uppercase tracking-widest mb-10 animate-fade-in rounded-full">
                 <span className="w-2 h-2 bg-brand-secondary rounded-full animate-pulse shadow-[0_0_10px_#CCFF00]"></span>
                 Sistema V2.0 Online
@@ -164,50 +173,66 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-primary via-brand-secondary to-brand-accent animate-gradient-x">Vendas na Shopee</span>
               </h1>
 
-              <p className="text-xl text-gray-400 mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0 font-light">
+              <p className="text-xl text-gray-400 mb-8 leading-relaxed max-w-2xl mx-auto font-light">
                 A primeira plataforma que une <strong className="text-brand-secondary">Inteligência Artificial</strong>, <strong className="text-brand-accent">Telegram</strong> e <strong className="text-brand-primary">WordPress</strong> para criar um ecossistema de vendas automático.
               </p>
-              <p className="text-lg text-gray-500 mb-12 max-w-xl mx-auto lg:mx-0 border-l-2 border-brand-primary/50 pl-6">
+              <p className="text-lg text-gray-500 mb-12 max-w-2xl mx-auto">
                 A suíte completa de ferramentas com IA para automação comercial, marketing de afiliados e gerenciamento de conteúdo.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-6">
                 <button
-                  onClick={() => setView('signup')}
+                  type="button"
+                  onClick={() => openAuthView('signup')}
                   className="w-full sm:w-auto px-10 py-5 bg-brand-primary text-white font-display font-black text-lg uppercase tracking-wider hover:bg-brand-primary_hover hover:scale-105 transition-all duration-300 shadow-button hover:shadow-button-hover rounded-xl"
                 >
                   Criar Conta Grátis
                 </button>
-                <button className="w-full sm:w-auto px-10 py-5 bg-transparent border border-white/20 text-white font-display font-bold text-lg uppercase tracking-wider hover:border-brand-secondary hover:text-brand-secondary transition-all duration-300 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => scrollToSection('features')}
+                  className="w-full sm:w-auto px-10 py-5 bg-transparent border border-white/20 text-white font-display font-bold text-lg uppercase tracking-wider hover:border-brand-secondary hover:text-brand-secondary transition-all duration-300 rounded-xl"
+                >
                   Ver Demo
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Login/Signup Form - Glassmorphism Corporate */}
-            <div className="lg:w-1/2 w-full max-w-md relative">
-              <div className="absolute inset-0 bg-brand-primary/20 blur-[100px] opacity-20 rounded-full"></div>
+      {/* Access Section */}
+      <section id="acesso" className="py-24 bg-neutrals-background_secondary border-y border-white/5 relative">
+        <div className="container mx-auto px-6 lg:px-16">
+          <div className="max-w-3xl mx-auto text-center mb-10">
+            <h2 className="text-4xl md:text-5xl font-display font-black text-white mb-4 uppercase tracking-tight">
+              Acesse a Plataforma
+            </h2>
+            <p className="text-gray-400 text-lg">
+              Entre na sua conta ou crie uma nova para começar a usar os recursos da ACI.
+            </p>
+          </div>
 
-              <AuthForm
-                view={view}
-                name={name}
-                email={email}
-                password={password}
-                phone={phone}
-                showPassword={showPassword}
-                isLoading={isLoading}
-                setName={setName}
-                setEmail={setEmail}
-                setPassword={setPassword}
-                setPhone={setPhone}
-                setShowPassword={setShowPassword}
-                setView={setView}
-                handleEmailChange={handleEmailChange}
-                handlePhoneChange={handlePhoneChange}
-                handleFormSubmit={handleFormSubmit}
-                error={error}
-              />
-            </div>
+          <div className="max-w-xl mx-auto">
+            <AuthForm
+              view={view}
+              name={name}
+              email={email}
+              password={password}
+              phone={phone}
+              showPassword={showPassword}
+              isLoading={isLoading}
+              setName={setName}
+              setEmail={setEmail}
+              setPassword={setPassword}
+              setPhone={setPhone}
+              setShowPassword={setShowPassword}
+              setView={openAuthView}
+              handleEmailChange={handleEmailChange}
+              handlePhoneChange={handlePhoneChange}
+              handleFormSubmit={handleFormSubmit}
+              error={error}
+            />
           </div>
         </div>
       </section>
@@ -375,7 +400,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
                 </li>
               </ul>
               <button
-                onClick={() => setView('signup')}
+                onClick={() => openAuthView('signup')}
                 className="w-full py-3 border border-white/20 text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:bg-white hover:text-black transition-all"
               >
                 Começar Grátis
@@ -418,7 +443,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
                 </li>
               </ul>
               <button
-                onClick={() => setView('signup')}
+                onClick={() => openAuthView('signup')}
                 className="w-full py-3 bg-brand-primary text-white font-bold uppercase tracking-wider text-sm rounded-lg hover:bg-brand-primary_hover transition-all shadow-button"
               >
                 Assinar Pro
@@ -458,7 +483,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
                 </li>
               </ul>
               <button
-                onClick={() => setView('signup')}
+                onClick={() => openAuthView('signup')}
                 className="w-full py-3 border border-brand-secondary text-brand-secondary font-bold uppercase tracking-wider text-sm rounded-lg hover:bg-brand-secondary hover:text-black transition-all"
               >
                 Falar com Vendas
@@ -495,13 +520,13 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess, onBackToLand
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                 <button
-                  onClick={() => setView('signup')}
+                  onClick={() => openAuthView('signup')}
                   className="px-10 py-4 bg-white text-brand-primary font-display font-bold text-lg uppercase tracking-wider rounded-lg hover:bg-gray-100 transition-all shadow-lg hover:shadow-xl hover:scale-105 transform"
                 >
                   Comece Grátis Agora →
                 </button>
                 <button
-                  onClick={() => setView('login')}
+                  onClick={() => openAuthView('login')}
                   className="px-10 py-4 bg-transparent border-2 border-white text-white font-bold text-lg uppercase tracking-wider rounded-lg hover:bg-white hover:text-brand-primary transition-all"
                 >
                   Já tenho conta
