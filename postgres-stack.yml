@@ -1,0 +1,76 @@
+version: '3.8'
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--locale=C.UTF-8 --encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - network_public
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        parallelism: 1
+        delay: 30s
+        order: stop-first
+        failure_action: rollback
+        monitor: 60s
+      restart_policy:
+        condition: on-failure
+        delay: 15s
+        max_attempts: 0
+        window: 120s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements,pg_trgm
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+      -c shared_buffers=512MB
+      -c effective_cache_size=2GB
+      -c maintenance_work_mem=128MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c max_worker_processes=8
+      -c max_parallel_workers_per_gather=4
+      -c max_parallel_workers=8
+      -c max_parallel_maintenance_workers=4
+      -c log_destination=stderr
+      -c log_min_duration_statement=1000
+      -c log_statement=ddl
+      -c log_checkpoints=on
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
+      -c log_temp_files=0
+      -c log_autovacuum_min_duration=0
+networks:
+  network_public:
+    driver: overlay
+    external: true
+volumes:
+  postgres_data:
+    driver: local
